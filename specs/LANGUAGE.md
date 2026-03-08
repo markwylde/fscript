@@ -959,6 +959,7 @@ The following constructs are intentionally outside Draft 0.1:
 import Array from 'std:array'
 import Json from 'std:json'
 import FileSystem from 'std:filesystem'
+import Logger from 'std:logger'
 import Result from 'std:result'
 
 type User = {
@@ -968,12 +969,18 @@ type User = {
 }
 
 parseUsers = (text: String): User[] => {
-  Json.parse(text)
+  Json.jsonToObject(text)
 }
 
 export loadActiveNames = (path: String): String[] => {
   text = FileSystem.readFile(path)
   users = parseUsers(text)
+  logger = Logger.create({
+    name: 'users',
+    level: 'info',
+    destination: 'stdout',
+  })
+  logged = Logger.log(logger, 'loaded users')
 
   users
     |> Array.filter((user) => user.active)

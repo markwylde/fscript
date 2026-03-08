@@ -11,6 +11,7 @@ description: A quick index of the core std modules documented in this site.
 - [`std:number`](../standard-library/number.md)
 - [`std:result`](../standard-library/result.md)
 - [`std:json`](../standard-library/json.md)
+- [`std:logger`](../standard-library/logger.md)
 - [`std:filesystem`](../standard-library/filesystem.md)
 - [`std:task`](../standard-library/task.md)
 

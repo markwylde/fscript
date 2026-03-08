@@ -29,6 +29,7 @@ import String from 'std:string'
 - `std:number`
 - `std:result`
 - `std:json`
+- `std:logger`
 - `std:filesystem`
 - `std:task`
 
@@ -42,5 +43,7 @@ Use the per-module pages for the conceptual model, then check [Implementation St
 
 - [Array](./array.md)
 - [Result](./result.md)
+- [JSON](./json.md)
+- [Logger](./logger.md)
 - [Filesystem](./filesystem.md)
 - [Pipes](../language-guide/pipes.md)
