@@ -15,6 +15,25 @@ fn snapshots_help_output() {
 }
 
 #[test]
+fn version_command_reports_build_metadata() {
+    let output = run_cli(["version"]);
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("fscript"));
+    assert!(stdout.contains("version:"));
+    assert!(stdout.contains("build date:"));
+    assert!(stdout.contains("target:"));
+    assert!(stdout.contains("profile:"));
+    assert!(stdout.contains("commit:"));
+}
+
+#[test]
 fn check_command_succeeds_end_to_end() {
     let output = run_cli(["check", example_path("hello_world.fs").as_str()]);
 
