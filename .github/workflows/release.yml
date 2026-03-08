@@ -46,6 +46,12 @@ jobs:
         uses: taiki-e/install-action@cross
 
       - name: Build CLI
+        env:
+          FSCRIPT_RELEASE_TAG: ${{ github.event.release.tag_name }}
+          FSCRIPT_BUILD_DATE: ${{ github.event.release.published_at }}
+          FSCRIPT_BUILD_TARGET: ${{ matrix.target }}
+          FSCRIPT_BUILD_PROFILE: release
+          FSCRIPT_GIT_SHA: ${{ github.sha }}
         run: |
           if [ "${{ matrix.use_cross }}" = "true" ]; then
             cross build --locked --release --package fscript-cli --bin fscript --target "${{ matrix.target }}"
