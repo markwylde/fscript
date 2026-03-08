@@ -229,8 +229,12 @@ pub extern "C" fn fscript_value_from_number(value: f64) -> NativeAbiValueHandle 
 }
 
 /// Prints a runtime value referenced by a native ABI handle.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live [`Value`] allocated by the runtime ABI helpers.
 #[unsafe(no_mangle)]
-pub extern "C" fn fscript_value_print(handle: *const Value) {
+pub unsafe extern "C" fn fscript_value_print(handle: *const Value) {
     if handle.is_null() {
         return;
     }
@@ -241,8 +245,13 @@ pub extern "C" fn fscript_value_print(handle: *const Value) {
 }
 
 /// Drops a runtime value referenced by a native ABI handle.
+///
+/// # Safety
+///
+/// `handle` must be null or an owned handle returned by the runtime ABI helpers, and it must
+/// not be used again after this function returns.
 #[unsafe(no_mangle)]
-pub extern "C" fn fscript_value_drop(handle: NativeAbiValueHandle) {
+pub unsafe extern "C" fn fscript_value_drop(handle: NativeAbiValueHandle) {
     if handle.is_null() {
         return;
     }
@@ -1036,9 +1045,11 @@ mod tests {
         let value = unsafe { &*handle };
         assert_eq!(value, &Value::Number(42.5));
 
-        super::fscript_value_drop(handle);
-        super::fscript_value_drop(std::ptr::null_mut());
-        super::fscript_value_print(std::ptr::null());
+        unsafe {
+            super::fscript_value_drop(handle);
+            super::fscript_value_drop(std::ptr::null_mut());
+            super::fscript_value_print(std::ptr::null());
+        }
     }
 
     #[test]
