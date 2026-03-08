@@ -109,6 +109,7 @@ enum StdModule {
     Number,
     Result,
     Json,
+    Logger,
     Http,
     Filesystem,
     Task,
@@ -1223,11 +1224,40 @@ fn std_module_from_source(source: &str) -> Option<StdModule> {
         "std:number" => Some(StdModule::Number),
         "std:result" => Some(StdModule::Result),
         "std:json" => Some(StdModule::Json),
+        "std:logger" => Some(StdModule::Logger),
         "std:http" => Some(StdModule::Http),
         "std:filesystem" => Some(StdModule::Filesystem),
         "std:task" => Some(StdModule::Task),
         _ => None,
     }
+}
+
+fn logger_handle_type() -> Type {
+    Type::Record(BTreeMap::from([
+        (
+            "destination".to_owned(),
+            Type::Union(vec![
+                Type::Literal(LiteralValue::String("stdout".to_owned())),
+                Type::Literal(LiteralValue::String("stderr".to_owned())),
+            ]),
+        ),
+        (
+            "level".to_owned(),
+            Type::Union(vec![
+                Type::Literal(LiteralValue::String("debug".to_owned())),
+                Type::Literal(LiteralValue::String("info".to_owned())),
+                Type::Literal(LiteralValue::String("warn".to_owned())),
+                Type::Literal(LiteralValue::String("error".to_owned())),
+            ]),
+        ),
+        (
+            "name".to_owned(),
+            Type::Union(vec![
+                Type::Primitive(PrimitiveType::String),
+                Type::Primitive(PrimitiveType::Null),
+            ]),
+        ),
+    ]))
 }
 
 fn std_module_export_scheme(
@@ -1337,13 +1367,37 @@ fn std_module_export_scheme(
                 return_type: Box::new(Type::Generic("T".to_owned())),
             }),
         },
-        (StdModule::Json, "parse") => Scheme::mono(Type::Function(FunctionType {
-            params: vec![Type::Primitive(PrimitiveType::String)],
-            return_type: Box::new(Type::Unknown),
-        })),
-        (StdModule::Json, "stringify") => Scheme::mono(Type::Function(FunctionType {
+        (StdModule::Json, "parse") | (StdModule::Json, "jsonToObject") => {
+            Scheme::mono(Type::Function(FunctionType {
+                params: vec![Type::Primitive(PrimitiveType::String)],
+                return_type: Box::new(Type::Unknown),
+            }))
+        }
+        (StdModule::Json, "stringify") | (StdModule::Json, "jsonToString") => {
+            Scheme::mono(Type::Function(FunctionType {
+                params: vec![Type::Unknown],
+                return_type: Box::new(Type::Primitive(PrimitiveType::String)),
+            }))
+        }
+        (StdModule::Json, "jsonToPrettyString") => Scheme::mono(Type::Function(FunctionType {
             params: vec![Type::Unknown],
             return_type: Box::new(Type::Primitive(PrimitiveType::String)),
+        })),
+        (StdModule::Logger, "create") => Scheme::mono(Type::Function(FunctionType {
+            params: vec![logger_handle_type()],
+            return_type: Box::new(logger_handle_type()),
+        })),
+        (StdModule::Logger, "log")
+        | (StdModule::Logger, "debug")
+        | (StdModule::Logger, "info")
+        | (StdModule::Logger, "warn")
+        | (StdModule::Logger, "error") => Scheme::mono(Type::Function(FunctionType {
+            params: vec![logger_handle_type(), Type::Primitive(PrimitiveType::String)],
+            return_type: Box::new(Type::Primitive(PrimitiveType::Undefined)),
+        })),
+        (StdModule::Logger, "prettyJson") => Scheme::mono(Type::Function(FunctionType {
+            params: vec![logger_handle_type(), Type::Unknown],
+            return_type: Box::new(Type::Primitive(PrimitiveType::Undefined)),
         })),
         (StdModule::Http, "serve") => Scheme::mono(Type::Function(FunctionType {
             params: vec![

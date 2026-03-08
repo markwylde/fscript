@@ -123,6 +123,7 @@ enum StdModule {
     Number,
     Result,
     Json,
+    Logger,
     Http,
     Filesystem,
     Task,
@@ -567,6 +568,7 @@ fn std_module_from_source(source: &str) -> Option<StdModule> {
         "std:number" => Some(StdModule::Number),
         "std:result" => Some(StdModule::Result),
         "std:json" => Some(StdModule::Json),
+        "std:logger" => Some(StdModule::Logger),
         "std:http" => Some(StdModule::Http),
         "std:filesystem" => Some(StdModule::Filesystem),
         "std:task" => Some(StdModule::Task),
@@ -584,6 +586,9 @@ fn module_export_kind(module: StdModule, name: &str, span: Span) -> Result<Value
         (StdModule::Array, "length")
         | (StdModule::Json, "parse")
         | (StdModule::Json, "stringify")
+        | (StdModule::Json, "jsonToObject")
+        | (StdModule::Json, "jsonToString")
+        | (StdModule::Json, "jsonToPrettyString")
         | (StdModule::String, "trim")
         | (StdModule::String, "uppercase")
         | (StdModule::String, "lowercase")
@@ -607,10 +612,33 @@ fn module_export_kind(module: StdModule, name: &str, span: Span) -> Result<Value
         },
         (StdModule::Object, "spread")
         | (StdModule::Result, "withDefault")
+        | (StdModule::Logger, "create")
+        | (StdModule::Logger, "log")
+        | (StdModule::Logger, "debug")
+        | (StdModule::Logger, "info")
+        | (StdModule::Logger, "warn")
+        | (StdModule::Logger, "error")
+        | (StdModule::Logger, "prettyJson")
         | (StdModule::Filesystem, "writeFile")
         | (StdModule::Http, "serve") => CallableInfo {
-            arity: 2,
-            effect: if matches!(module, StdModule::Filesystem | StdModule::Http) {
+            arity: match (module, name) {
+                (StdModule::Object, "spread")
+                | (StdModule::Result, "withDefault")
+                | (StdModule::Filesystem, "writeFile")
+                | (StdModule::Http, "serve")
+                | (StdModule::Logger, "log")
+                | (StdModule::Logger, "debug")
+                | (StdModule::Logger, "info")
+                | (StdModule::Logger, "warn")
+                | (StdModule::Logger, "error")
+                | (StdModule::Logger, "prettyJson") => 2,
+                (StdModule::Logger, "create") => 1,
+                _ => 2,
+            },
+            effect: if matches!(
+                module,
+                StdModule::Filesystem | StdModule::Http | StdModule::Logger
+            ) {
                 Effect::Effectful
             } else {
                 Effect::Pure
@@ -648,6 +676,7 @@ fn std_module_name(module: StdModule) -> &'static str {
         StdModule::Number => "std:number",
         StdModule::Result => "std:result",
         StdModule::Json => "std:json",
+        StdModule::Logger => "std:logger",
         StdModule::Http => "std:http",
         StdModule::Filesystem => "std:filesystem",
         StdModule::Task => "std:task",

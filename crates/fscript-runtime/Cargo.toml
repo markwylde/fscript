@@ -3,6 +3,9 @@ name = "fscript-runtime"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["rlib", "staticlib"]
+
 [dependencies]
 fscript-ir = { path = "../fscript-ir" }
 thiserror.workspace = true

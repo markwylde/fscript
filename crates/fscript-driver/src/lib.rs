@@ -1463,8 +1463,20 @@ impl Value {
                     shared_runtime::NativeFunction::ArrayFilter => NativeFunction::ArrayFilter,
                     shared_runtime::NativeFunction::ArrayLength => NativeFunction::ArrayLength,
                     shared_runtime::NativeFunction::HttpServe => NativeFunction::HttpServe,
-                    shared_runtime::NativeFunction::JsonParse => NativeFunction::JsonParse,
-                    shared_runtime::NativeFunction::JsonStringify => NativeFunction::JsonStringify,
+                    shared_runtime::NativeFunction::JsonToObject => NativeFunction::JsonToObject,
+                    shared_runtime::NativeFunction::JsonToString => NativeFunction::JsonToString,
+                    shared_runtime::NativeFunction::JsonToPrettyString => {
+                        NativeFunction::JsonToPrettyString
+                    }
+                    shared_runtime::NativeFunction::LoggerCreate => NativeFunction::LoggerCreate,
+                    shared_runtime::NativeFunction::LoggerLog => NativeFunction::LoggerLog,
+                    shared_runtime::NativeFunction::LoggerDebug => NativeFunction::LoggerDebug,
+                    shared_runtime::NativeFunction::LoggerInfo => NativeFunction::LoggerInfo,
+                    shared_runtime::NativeFunction::LoggerWarn => NativeFunction::LoggerWarn,
+                    shared_runtime::NativeFunction::LoggerError => NativeFunction::LoggerError,
+                    shared_runtime::NativeFunction::LoggerPrettyJson => {
+                        NativeFunction::LoggerPrettyJson
+                    }
                     shared_runtime::NativeFunction::FilesystemReadFile => {
                         NativeFunction::FilesystemReadFile
                     }
@@ -1593,8 +1605,16 @@ enum NativeFunction {
     ArrayFilter,
     ArrayLength,
     HttpServe,
-    JsonParse,
-    JsonStringify,
+    JsonToObject,
+    JsonToString,
+    JsonToPrettyString,
+    LoggerCreate,
+    LoggerLog,
+    LoggerDebug,
+    LoggerInfo,
+    LoggerWarn,
+    LoggerError,
+    LoggerPrettyJson,
     FilesystemReadFile,
     FilesystemWriteFile,
     FilesystemExists,
@@ -1625,8 +1645,16 @@ impl NativeFunction {
             Self::ArrayFilter => "Array.filter",
             Self::ArrayLength => "Array.length",
             Self::HttpServe => "Http.serve",
-            Self::JsonParse => "Json.parse",
-            Self::JsonStringify => "Json.stringify",
+            Self::JsonToObject => "Json.jsonToObject",
+            Self::JsonToString => "Json.jsonToString",
+            Self::JsonToPrettyString => "Json.jsonToPrettyString",
+            Self::LoggerCreate => "Logger.create",
+            Self::LoggerLog => "Logger.log",
+            Self::LoggerDebug => "Logger.debug",
+            Self::LoggerInfo => "Logger.info",
+            Self::LoggerWarn => "Logger.warn",
+            Self::LoggerError => "Logger.error",
+            Self::LoggerPrettyJson => "Logger.prettyJson",
             Self::FilesystemReadFile => "FileSystem.readFile",
             Self::FilesystemWriteFile => "FileSystem.writeFile",
             Self::FilesystemExists => "FileSystem.exists",
@@ -1656,12 +1684,20 @@ impl NativeFunction {
             Self::ArrayMap | Self::ArrayFilter => 2,
             Self::HttpServe => 2,
             Self::ArrayLength
-            | Self::JsonParse
-            | Self::JsonStringify
+            | Self::JsonToObject
+            | Self::JsonToString
+            | Self::JsonToPrettyString
+            | Self::LoggerCreate
             | Self::FilesystemReadFile
             | Self::FilesystemExists
             | Self::FilesystemDeleteFile
             | Self::FilesystemReadDir => 1,
+            Self::LoggerLog
+            | Self::LoggerDebug
+            | Self::LoggerInfo
+            | Self::LoggerWarn
+            | Self::LoggerError
+            | Self::LoggerPrettyJson => 2,
             Self::FilesystemWriteFile => 2,
             Self::StringTrim
             | Self::StringUppercase
@@ -1799,6 +1835,22 @@ fn load_std_module(source: &str) -> Result<Value, RuntimeFailed> {
             ("length", NativeFunction::ArrayLength),
         ])),
         "std:http" => Ok(native_module(&[("serve", NativeFunction::HttpServe)])),
+        "std:json" => Ok(native_module(&[
+            ("parse", NativeFunction::JsonToObject),
+            ("stringify", NativeFunction::JsonToString),
+            ("jsonToObject", NativeFunction::JsonToObject),
+            ("jsonToString", NativeFunction::JsonToString),
+            ("jsonToPrettyString", NativeFunction::JsonToPrettyString),
+        ])),
+        "std:logger" => Ok(native_module(&[
+            ("create", NativeFunction::LoggerCreate),
+            ("log", NativeFunction::LoggerLog),
+            ("debug", NativeFunction::LoggerDebug),
+            ("info", NativeFunction::LoggerInfo),
+            ("warn", NativeFunction::LoggerWarn),
+            ("error", NativeFunction::LoggerError),
+            ("prettyJson", NativeFunction::LoggerPrettyJson),
+        ])),
         "std:object" => Ok(native_module(&[("spread", NativeFunction::ObjectSpread)])),
         "std:string" => Ok(native_module(&[
             ("trim", NativeFunction::StringTrim),
@@ -2426,8 +2478,16 @@ fn execute_native_function(
         NativeFunction::ArrayFilter => array_filter(args, yield_values),
         NativeFunction::ArrayLength => array_length(args).map_err(RuntimeControl::from),
         NativeFunction::HttpServe
-        | NativeFunction::JsonParse
-        | NativeFunction::JsonStringify
+        | NativeFunction::JsonToObject
+        | NativeFunction::JsonToString
+        | NativeFunction::JsonToPrettyString
+        | NativeFunction::LoggerCreate
+        | NativeFunction::LoggerLog
+        | NativeFunction::LoggerDebug
+        | NativeFunction::LoggerInfo
+        | NativeFunction::LoggerWarn
+        | NativeFunction::LoggerError
+        | NativeFunction::LoggerPrettyJson
         | NativeFunction::FilesystemReadFile
         | NativeFunction::FilesystemWriteFile
         | NativeFunction::FilesystemExists
@@ -3094,7 +3154,7 @@ mod tests {
             "import Json from 'std:json'\n\
              import FileSystem from 'std:filesystem'\n\
              \n\
-             data = Json.parse(FileSystem.readFile('{}'))\n\
+             data = Json.jsonToObject(FileSystem.readFile('{}'))\n\
              name = data.name",
             project.join("user.json")
         );

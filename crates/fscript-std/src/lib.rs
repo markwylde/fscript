@@ -3,7 +3,7 @@
 use std::{
     collections::BTreeMap,
     fs,
-    io::{Read, Write},
+    io::{Read, Write, stderr, stdout},
     net::{TcpListener, TcpStream},
     path::{Path, PathBuf},
     str::Chars,
@@ -23,8 +23,20 @@ pub fn load_module(source: &str) -> Result<Value, RuntimeError> {
             ("length", NativeFunction::ArrayLength),
         ])),
         "std:json" => Ok(native_module(&[
-            ("parse", NativeFunction::JsonParse),
-            ("stringify", NativeFunction::JsonStringify),
+            ("parse", NativeFunction::JsonToObject),
+            ("stringify", NativeFunction::JsonToString),
+            ("jsonToObject", NativeFunction::JsonToObject),
+            ("jsonToString", NativeFunction::JsonToString),
+            ("jsonToPrettyString", NativeFunction::JsonToPrettyString),
+        ])),
+        "std:logger" => Ok(native_module(&[
+            ("create", NativeFunction::LoggerCreate),
+            ("log", NativeFunction::LoggerLog),
+            ("debug", NativeFunction::LoggerDebug),
+            ("info", NativeFunction::LoggerInfo),
+            ("warn", NativeFunction::LoggerWarn),
+            ("error", NativeFunction::LoggerError),
+            ("prettyJson", NativeFunction::LoggerPrettyJson),
         ])),
         "std:http" => Ok(native_module(&[("serve", NativeFunction::HttpServe)])),
         "std:filesystem" => Ok(native_module(&[
@@ -87,8 +99,26 @@ where
         NativeFunction::ArrayFilter => array_filter(args, &mut call),
         NativeFunction::ArrayLength => array_length(args).map_err(E::from),
         NativeFunction::HttpServe => http_serve(args, &mut call),
-        NativeFunction::JsonParse => json_parse(args).map_err(E::from),
-        NativeFunction::JsonStringify => json_stringify(args).map_err(E::from),
+        NativeFunction::JsonToObject => json_to_object(args).map_err(E::from),
+        NativeFunction::JsonToString => json_to_string(args).map_err(E::from),
+        NativeFunction::JsonToPrettyString => json_to_pretty_string(args).map_err(E::from),
+        NativeFunction::LoggerCreate => logger_create(args).map_err(E::from),
+        NativeFunction::LoggerLog => {
+            logger_log(args, LoggerSeverity::Info, "Logger.log").map_err(E::from)
+        }
+        NativeFunction::LoggerDebug => {
+            logger_log(args, LoggerSeverity::Debug, "Logger.debug").map_err(E::from)
+        }
+        NativeFunction::LoggerInfo => {
+            logger_log(args, LoggerSeverity::Info, "Logger.info").map_err(E::from)
+        }
+        NativeFunction::LoggerWarn => {
+            logger_log(args, LoggerSeverity::Warn, "Logger.warn").map_err(E::from)
+        }
+        NativeFunction::LoggerError => {
+            logger_log(args, LoggerSeverity::Error, "Logger.error").map_err(E::from)
+        }
+        NativeFunction::LoggerPrettyJson => logger_pretty_json(args).map_err(E::from),
         NativeFunction::FilesystemReadFile => filesystem_read_file(args).map_err(E::from),
         NativeFunction::FilesystemWriteFile => filesystem_write_file(args).map_err(E::from),
         NativeFunction::FilesystemExists => filesystem_exists(args).map_err(E::from),
@@ -267,20 +297,23 @@ where
     Ok(Value::Undefined)
 }
 
-fn json_parse(args: Vec<Value>) -> Result<Value, RuntimeError> {
+fn json_to_object(args: Vec<Value>) -> Result<Value, RuntimeError> {
     let [text]: [Value; 1] = args
         .try_into()
-        .map_err(|_| RuntimeError::new("Json.parse expected exactly 1 argument"))?;
+        .map_err(|_| RuntimeError::new("Json.jsonToObject expected exactly 1 argument"))?;
     let Value::String(text) = text else {
-        return Err(RuntimeError::new("Json.parse expects a String argument"));
+        return Err(RuntimeError::new(
+            "Json.jsonToObject expects a String argument",
+        ));
     };
+    let text = strip_relaxed_json_comments(&text)?;
 
     let mut parser = JsonParser::new(&text);
     let value = parser.parse_value()?;
     parser.skip_whitespace();
     if parser.peek().is_some() {
         return Err(RuntimeError::new(
-            "Json.parse found trailing content after the first JSON value",
+            "Json.jsonToObject found trailing content after the first JSON value",
         ));
     }
 
@@ -306,6 +339,227 @@ struct HttpResponse {
     status: u16,
     content_type: String,
     body: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum LoggerSeverity {
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LoggerDestination {
+    Stdout,
+    Stderr,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct LoggerConfig {
+    name: Option<String>,
+    level: LoggerSeverity,
+    destination: LoggerDestination,
+}
+
+impl LoggerSeverity {
+    fn api_name(self) -> &'static str {
+        match self {
+            Self::Debug => "debug",
+            Self::Info => "info",
+            Self::Warn => "warn",
+            Self::Error => "error",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Debug => "DEBUG",
+            Self::Info => "INFO",
+            Self::Warn => "WARN",
+            Self::Error => "ERROR",
+        }
+    }
+}
+
+fn strip_relaxed_json_comments(text: &str) -> Result<String, RuntimeError> {
+    let mut stripped = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    let mut in_string = false;
+    let mut escaped = false;
+
+    while let Some(ch) = chars.next() {
+        if in_string {
+            stripped.push(ch);
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+
+        if ch == '"' {
+            in_string = true;
+            stripped.push(ch);
+            continue;
+        }
+
+        if ch == '/' {
+            match chars.peek().copied() {
+                Some('/') => {
+                    chars.next();
+                    for comment_char in chars.by_ref() {
+                        if comment_char == '\n' {
+                            stripped.push('\n');
+                            break;
+                        }
+                    }
+                    continue;
+                }
+                Some('*') => {
+                    chars.next();
+                    let mut prev = None;
+                    let mut closed = false;
+                    for comment_char in chars.by_ref() {
+                        if comment_char == '\n' {
+                            stripped.push('\n');
+                        }
+                        if prev == Some('*') && comment_char == '/' {
+                            closed = true;
+                            break;
+                        }
+                        prev = Some(comment_char);
+                    }
+                    if !closed {
+                        return Err(RuntimeError::new(
+                            "Json.jsonToObject found an unterminated block comment",
+                        ));
+                    }
+                    continue;
+                }
+                _ => {}
+            }
+        }
+
+        if ch == '#' {
+            for comment_char in chars.by_ref() {
+                if comment_char == '\n' {
+                    stripped.push('\n');
+                    break;
+                }
+            }
+            continue;
+        }
+
+        stripped.push(ch);
+    }
+
+    Ok(stripped
+        .lines()
+        .filter(|line| line.trim() != "---")
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
+fn parse_logger_config(value: &Value, context: &str) -> Result<LoggerConfig, RuntimeError> {
+    let Value::Record(fields) = value else {
+        return Err(RuntimeError::new(format!(
+            "{context} must be a Logger record"
+        )));
+    };
+
+    let name = match fields.get("name") {
+        Some(Value::String(value)) => Some(value.clone()),
+        Some(Value::Null) | None => None,
+        Some(other) => {
+            return Err(RuntimeError::new(format!(
+                "{context}.name must be String or Null, found `{other}`"
+            )));
+        }
+    };
+    let level = match record_string_field(fields, "level", context)?.as_str() {
+        "debug" => LoggerSeverity::Debug,
+        "info" => LoggerSeverity::Info,
+        "warn" => LoggerSeverity::Warn,
+        "error" => LoggerSeverity::Error,
+        other => {
+            return Err(RuntimeError::new(format!(
+                "{context}.level found unsupported level `{other}`"
+            )));
+        }
+    };
+    let destination = match record_string_field(fields, "destination", context)?.as_str() {
+        "stdout" => LoggerDestination::Stdout,
+        "stderr" => LoggerDestination::Stderr,
+        other => {
+            return Err(RuntimeError::new(format!(
+                "{context}.destination found unsupported destination `{other}`"
+            )));
+        }
+    };
+
+    Ok(LoggerConfig {
+        name,
+        level,
+        destination,
+    })
+}
+
+fn logger_to_value(config: &LoggerConfig) -> Value {
+    Value::Record(BTreeMap::from([
+        (
+            "name".to_owned(),
+            config.name.clone().map_or(Value::Null, Value::String),
+        ),
+        (
+            "level".to_owned(),
+            Value::String(config.level.api_name().to_owned()),
+        ),
+        (
+            "destination".to_owned(),
+            Value::String(
+                match config.destination {
+                    LoggerDestination::Stdout => "stdout",
+                    LoggerDestination::Stderr => "stderr",
+                }
+                .to_owned(),
+            ),
+        ),
+    ]))
+}
+
+fn format_logger_line(config: &LoggerConfig, severity: LoggerSeverity, message: &str) -> String {
+    let mut line = String::new();
+    if let Some(name) = &config.name {
+        line.push('[');
+        line.push_str(name);
+        line.push_str("] ");
+    }
+    line.push_str(severity.label());
+    line.push(' ');
+    line.push_str(message);
+    line.push('\n');
+    line
+}
+
+fn write_logger_output(destination: LoggerDestination, line: &str) -> Result<(), RuntimeError> {
+    match destination {
+        LoggerDestination::Stdout => {
+            let mut handle = stdout();
+            handle
+                .write_all(line.as_bytes())
+                .map_err(|error| RuntimeError::new(format!("Logger output failed: {error}")))
+        }
+        LoggerDestination::Stderr => {
+            let mut handle = stderr();
+            handle
+                .write_all(line.as_bytes())
+                .map_err(|error| RuntimeError::new(format!("Logger output failed: {error}")))
+        }
+    }
 }
 
 fn parse_http_options(value: Value) -> Result<HttpServeOptions, RuntimeError> {
@@ -493,12 +747,75 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         .position(|window| window == needle)
 }
 
-fn json_stringify(args: Vec<Value>) -> Result<Value, RuntimeError> {
+fn json_to_string(args: Vec<Value>) -> Result<Value, RuntimeError> {
     let [value]: [Value; 1] = args
         .try_into()
-        .map_err(|_| RuntimeError::new("Json.stringify expected exactly 1 argument"))?;
+        .map_err(|_| RuntimeError::new("Json.jsonToString expected exactly 1 argument"))?;
 
-    Ok(Value::String(stringify_json_value(&value)?))
+    Ok(Value::String(stringify_json_value(
+        &value,
+        JsonFormat::Compact,
+    )?))
+}
+
+fn json_to_pretty_string(args: Vec<Value>) -> Result<Value, RuntimeError> {
+    let [value]: [Value; 1] = args
+        .try_into()
+        .map_err(|_| RuntimeError::new("Json.jsonToPrettyString expected exactly 1 argument"))?;
+
+    Ok(Value::String(stringify_json_value(
+        &value,
+        JsonFormat::Pretty,
+    )?))
+}
+
+fn logger_create(args: Vec<Value>) -> Result<Value, RuntimeError> {
+    let [options]: [Value; 1] = args
+        .try_into()
+        .map_err(|_| RuntimeError::new("Logger.create expected exactly 1 argument"))?;
+    let logger = parse_logger_config(&options, "Logger.create options")?;
+    Ok(logger_to_value(&logger))
+}
+
+fn logger_log(
+    args: Vec<Value>,
+    severity: LoggerSeverity,
+    function_name: &str,
+) -> Result<Value, RuntimeError> {
+    let [logger, message]: [Value; 2] = args
+        .try_into()
+        .map_err(|_| RuntimeError::new(format!("{function_name} expected exactly 2 arguments")))?;
+    let logger = parse_logger_config(&logger, "Logger logger")?;
+    let Value::String(message) = message else {
+        return Err(RuntimeError::new(format!(
+            "{function_name} expects a String message argument"
+        )));
+    };
+
+    if severity >= logger.level {
+        let line = format_logger_line(&logger, severity, &message);
+        write_logger_output(logger.destination, &line)?;
+    }
+
+    Ok(Value::Undefined)
+}
+
+fn logger_pretty_json(args: Vec<Value>) -> Result<Value, RuntimeError> {
+    let [logger, value]: [Value; 2] = args
+        .try_into()
+        .map_err(|_| RuntimeError::new("Logger.prettyJson expected exactly 2 arguments"))?;
+    let logger = parse_logger_config(&logger, "Logger logger")?;
+
+    if LoggerSeverity::Info >= logger.level {
+        let line = format_logger_line(
+            &logger,
+            LoggerSeverity::Info,
+            &stringify_json_value(&value, JsonFormat::Pretty)?,
+        );
+        write_logger_output(logger.destination, &line)?;
+    }
+
+    Ok(Value::Undefined)
 }
 
 fn filesystem_read_file(args: Vec<Value>) -> Result<Value, RuntimeError> {
@@ -841,48 +1158,121 @@ fn filesystem_error(function_name: &str, path: &Path, error: std::io::Error) -> 
     ))
 }
 
-fn stringify_json_value(value: &Value) -> Result<String, RuntimeError> {
+#[derive(Clone, Copy)]
+enum JsonFormat {
+    Compact,
+    Pretty,
+}
+
+fn stringify_json_value(value: &Value, format: JsonFormat) -> Result<String, RuntimeError> {
+    stringify_json_value_with_depth(value, format, 0)
+}
+
+fn stringify_json_value_with_depth(
+    value: &Value,
+    format: JsonFormat,
+    depth: usize,
+) -> Result<String, RuntimeError> {
     match value {
         Value::String(value) => Ok(format!("\"{}\"", escape_json_string(value))),
         Value::Number(value) => {
             if !value.is_finite() {
                 return Err(RuntimeError::new(
-                    "Json.stringify cannot encode non-finite Number values",
+                    "Json.jsonToString cannot encode non-finite Number values",
                 ));
             }
             Ok(value.to_string())
         }
         Value::Boolean(value) => Ok(value.to_string()),
         Value::Null => Ok("null".to_owned()),
-        Value::Array(items) | Value::Sequence(items) => {
+        Value::Array(items) | Value::Sequence(items) => stringify_json_items(items, format, depth),
+        Value::Record(fields) => stringify_json_record(fields, format, depth),
+        Value::Undefined => Err(RuntimeError::new(
+            "Json.jsonToString cannot encode Undefined values",
+        )),
+        Value::Deferred(_) => Err(RuntimeError::new(
+            "Json.jsonToString cannot encode deferred values",
+        )),
+        Value::Function(_) | Value::NativeFunction(_) => Err(RuntimeError::new(
+            "Json.jsonToString cannot encode function values",
+        )),
+    }
+}
+
+fn stringify_json_items(
+    items: &[Value],
+    format: JsonFormat,
+    depth: usize,
+) -> Result<String, RuntimeError> {
+    if items.is_empty() {
+        return Ok("[]".to_owned());
+    }
+
+    match format {
+        JsonFormat::Compact => {
             let items = items
                 .iter()
-                .map(stringify_json_value)
+                .map(|item| stringify_json_value_with_depth(item, format, depth + 1))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(format!("[{}]", items.join(",")))
         }
-        Value::Record(fields) => {
+        JsonFormat::Pretty => {
+            let indent = "  ".repeat(depth + 1);
+            let closing_indent = "  ".repeat(depth);
+            let items = items
+                .iter()
+                .map(|item| {
+                    Ok(format!(
+                        "{}{}",
+                        indent,
+                        stringify_json_value_with_depth(item, format, depth + 1)?
+                    ))
+                })
+                .collect::<Result<Vec<_>, RuntimeError>>()?;
+            Ok(format!("[\n{}\n{}]", items.join(",\n"), closing_indent))
+        }
+    }
+}
+
+fn stringify_json_record(
+    fields: &BTreeMap<String, Value>,
+    format: JsonFormat,
+    depth: usize,
+) -> Result<String, RuntimeError> {
+    if fields.is_empty() {
+        return Ok("{}".to_owned());
+    }
+
+    match format {
+        JsonFormat::Compact => {
             let fields = fields
                 .iter()
                 .map(|(name, value)| {
                     Ok(format!(
                         "\"{}\":{}",
                         escape_json_string(name),
-                        stringify_json_value(value)?
+                        stringify_json_value_with_depth(value, format, depth + 1)?
                     ))
                 })
                 .collect::<Result<Vec<_>, RuntimeError>>()?;
             Ok(format!("{{{}}}", fields.join(",")))
         }
-        Value::Undefined => Err(RuntimeError::new(
-            "Json.stringify cannot encode Undefined values",
-        )),
-        Value::Deferred(_) => Err(RuntimeError::new(
-            "Json.stringify cannot encode deferred values",
-        )),
-        Value::Function(_) | Value::NativeFunction(_) => Err(RuntimeError::new(
-            "Json.stringify cannot encode function values",
-        )),
+        JsonFormat::Pretty => {
+            let indent = "  ".repeat(depth + 1);
+            let closing_indent = "  ".repeat(depth);
+            let fields = fields
+                .iter()
+                .map(|(name, value)| {
+                    Ok(format!(
+                        "{}\"{}\": {}",
+                        indent,
+                        escape_json_string(name),
+                        stringify_json_value_with_depth(value, format, depth + 1)?
+                    ))
+                })
+                .collect::<Result<Vec<_>, RuntimeError>>()?;
+            Ok(format!("{{\n{}\n{}}}", fields.join(",\n"), closing_indent))
+        }
     }
 }
 
@@ -936,9 +1326,9 @@ impl<'a> JsonParser<'a> {
                 Ok(Value::Null)
             }
             Some(other) => Err(RuntimeError::new(format!(
-                "Json.parse found unexpected character `{other}`"
+                "Json.jsonToObject found unexpected character `{other}`"
             ))),
-            None => Err(RuntimeError::new("Json.parse expected a JSON value")),
+            None => Err(RuntimeError::new("Json.jsonToObject expected a JSON value")),
         }
     }
 
@@ -971,12 +1361,12 @@ impl<'a> JsonParser<'a> {
                 }
                 Some(other) => {
                     return Err(RuntimeError::new(format!(
-                        "Json.parse expected `,` or `}}`, found `{other}`"
+                        "Json.jsonToObject expected `,` or `}}`, found `{other}`"
                     )));
                 }
                 None => {
                     return Err(RuntimeError::new(
-                        "Json.parse reached the end of input inside an object",
+                        "Json.jsonToObject reached the end of input inside an object",
                     ));
                 }
             }
@@ -1007,12 +1397,12 @@ impl<'a> JsonParser<'a> {
                 }
                 Some(other) => {
                     return Err(RuntimeError::new(format!(
-                        "Json.parse expected `,` or `]`, found `{other}`"
+                        "Json.jsonToObject expected `,` or `]`, found `{other}`"
                     )));
                 }
                 None => {
                     return Err(RuntimeError::new(
-                        "Json.parse reached the end of input inside an array",
+                        "Json.jsonToObject reached the end of input inside an array",
                     ));
                 }
             }
@@ -1036,7 +1426,7 @@ impl<'a> JsonParser<'a> {
                 Some(ch) => {
                     if ch.is_control() {
                         return Err(RuntimeError::new(
-                            "Json.parse strings cannot contain control characters",
+                            "Json.jsonToObject strings cannot contain control characters",
                         ));
                     }
                     value.push(ch);
@@ -1044,7 +1434,7 @@ impl<'a> JsonParser<'a> {
                 }
                 None => {
                     return Err(RuntimeError::new(
-                        "Json.parse reached the end of input inside a string",
+                        "Json.jsonToObject reached the end of input inside a string",
                     ));
                 }
             }
@@ -1054,7 +1444,7 @@ impl<'a> JsonParser<'a> {
     fn parse_escape_sequence(&mut self) -> Result<char, RuntimeError> {
         let Some(escape) = self.peek() else {
             return Err(RuntimeError::new(
-                "Json.parse found an unterminated escape sequence",
+                "Json.jsonToObject found an unterminated escape sequence",
             ));
         };
         self.advance();
@@ -1070,7 +1460,7 @@ impl<'a> JsonParser<'a> {
             't' => Ok('\t'),
             'u' => self.parse_unicode_escape(),
             other => Err(RuntimeError::new(format!(
-                "Json.parse found an unsupported escape sequence `\\{other}`"
+                "Json.jsonToObject found an unsupported escape sequence `\\{other}`"
             ))),
         }
     }
@@ -1080,20 +1470,21 @@ impl<'a> JsonParser<'a> {
         for _ in 0..4 {
             let Some(ch) = self.peek() else {
                 return Err(RuntimeError::new(
-                    "Json.parse found an incomplete unicode escape",
+                    "Json.jsonToObject found an incomplete unicode escape",
                 ));
             };
             self.advance();
             let digit = ch.to_digit(16).ok_or_else(|| {
                 RuntimeError::new(format!(
-                    "Json.parse found an invalid unicode escape digit `{ch}`"
+                    "Json.jsonToObject found an invalid unicode escape digit `{ch}`"
                 ))
             })?;
             codepoint = (codepoint << 4) | digit;
         }
 
-        char::from_u32(codepoint)
-            .ok_or_else(|| RuntimeError::new("Json.parse found an invalid unicode scalar value"))
+        char::from_u32(codepoint).ok_or_else(|| {
+            RuntimeError::new("Json.jsonToObject found an invalid unicode scalar value")
+        })
     }
 
     fn parse_number(&mut self) -> Result<f64, RuntimeError> {
@@ -1115,7 +1506,11 @@ impl<'a> JsonParser<'a> {
                     self.advance();
                 }
             }
-            _ => return Err(RuntimeError::new("Json.parse expected a valid number")),
+            _ => {
+                return Err(RuntimeError::new(
+                    "Json.jsonToObject expected a valid number",
+                ));
+            }
         }
 
         if self.peek() == Some('.') {
@@ -1131,7 +1526,7 @@ impl<'a> JsonParser<'a> {
 
             if digits == 0 {
                 return Err(RuntimeError::new(
-                    "Json.parse expected digits after the decimal point",
+                    "Json.jsonToObject expected digits after the decimal point",
                 ));
             }
         }
@@ -1154,14 +1549,14 @@ impl<'a> JsonParser<'a> {
 
             if digits == 0 {
                 return Err(RuntimeError::new(
-                    "Json.parse expected exponent digits after `e`",
+                    "Json.jsonToObject expected exponent digits after `e`",
                 ));
             }
         }
 
         number
             .parse::<f64>()
-            .map_err(|_| RuntimeError::new(format!("Json.parse could not parse `{number}`")))
+            .map_err(|_| RuntimeError::new(format!("Json.jsonToObject could not parse `{number}`")))
     }
 
     fn expect_keyword(&mut self, expected: &str) -> Result<(), RuntimeError> {
@@ -1178,17 +1573,53 @@ impl<'a> JsonParser<'a> {
                 Ok(())
             }
             Some(actual) => Err(RuntimeError::new(format!(
-                "Json.parse expected `{expected}`, found `{actual}`"
+                "Json.jsonToObject expected `{expected}`, found `{actual}`"
             ))),
             None => Err(RuntimeError::new(format!(
-                "Json.parse expected `{expected}`, found the end of input"
+                "Json.jsonToObject expected `{expected}`, found the end of input"
             ))),
         }
     }
 
     fn skip_whitespace(&mut self) {
-        while matches!(self.peek(), Some(ch) if ch.is_whitespace()) {
+        loop {
+            while matches!(self.peek(), Some(ch) if ch.is_whitespace()) {
+                self.advance();
+            }
+
+            if self.peek() != Some('/') {
+                return;
+            }
+
             self.advance();
+            match self.peek() {
+                Some('/') => {
+                    while let Some(ch) = self.peek() {
+                        self.advance();
+                        if ch == '\n' {
+                            break;
+                        }
+                    }
+                }
+                Some('*') => {
+                    self.advance();
+                    let mut prev = None;
+                    loop {
+                        let Some(ch) = self.peek() else {
+                            return;
+                        };
+                        self.advance();
+                        if prev == Some('*') && ch == '/' {
+                            break;
+                        }
+                        prev = Some(ch);
+                    }
+                }
+                _ => {
+                    self.current = Some('/');
+                    return;
+                }
+            }
         }
     }
 
@@ -1206,8 +1637,9 @@ mod tests {
     use std::{collections::BTreeMap, fs, path::PathBuf};
 
     use super::{
-        execute_native_function, load_module, parse_http_options, parse_http_response,
-        read_http_request,
+        JsonFormat, LoggerConfig, LoggerDestination, LoggerSeverity, execute_native_function,
+        format_logger_line, load_module, logger_to_value, parse_http_options, parse_http_response,
+        parse_logger_config, read_http_request, stringify_json_value,
     };
     use fscript_ir as ir;
     use fscript_runtime::{
@@ -1270,6 +1702,25 @@ mod tests {
 
         assert!(exports.contains_key("parse"));
         assert!(exports.contains_key("stringify"));
+        assert!(exports.contains_key("jsonToObject"));
+        assert!(exports.contains_key("jsonToString"));
+        assert!(exports.contains_key("jsonToPrettyString"));
+    }
+
+    #[test]
+    fn loads_std_logger_module() {
+        let module = load_module("std:logger").expect("std:logger should load");
+        let Value::Record(exports) = module else {
+            panic!("stdlib modules should be records");
+        };
+
+        assert!(exports.contains_key("create"));
+        assert!(exports.contains_key("log"));
+        assert!(exports.contains_key("debug"));
+        assert!(exports.contains_key("info"));
+        assert!(exports.contains_key("warn"));
+        assert!(exports.contains_key("error"));
+        assert!(exports.contains_key("prettyJson"));
     }
 
     #[test]
@@ -1344,16 +1795,16 @@ mod tests {
     #[test]
     fn json_parse_builds_runtime_values() {
         let result = execute_native_function(
-            NativeFunction::JsonParse,
+            NativeFunction::JsonToObject,
             vec![Value::String(
                 r#"{"name":"Ada","active":true,"scores":[1,2],"meta":null}"#.to_owned(),
             )],
             |_callee, _args| -> Result<Value, RuntimeError> {
-                unreachable!("Json.parse does not call back")
+                unreachable!("Json.jsonToObject does not call back")
             },
             |value| -> Result<Value, RuntimeError> { Ok(value) },
         )
-        .expect("Json.parse should succeed");
+        .expect("Json.jsonToObject should succeed");
 
         assert_eq!(
             result,
@@ -1372,22 +1823,103 @@ mod tests {
     #[test]
     fn json_stringify_serializes_runtime_values() {
         let result = execute_native_function(
-            NativeFunction::JsonStringify,
+            NativeFunction::JsonToString,
             vec![Value::Record(BTreeMap::from([
                 ("active".to_owned(), Value::Boolean(true)),
                 ("name".to_owned(), Value::String("Ada".to_owned())),
             ]))],
             |_callee, _args| -> Result<Value, RuntimeError> {
-                unreachable!("Json.stringify does not call back")
+                unreachable!("Json.jsonToString does not call back")
             },
             |value| -> Result<Value, RuntimeError> { Ok(value) },
         )
-        .expect("Json.stringify should succeed");
+        .expect("Json.jsonToString should succeed");
 
         assert_eq!(
             result,
             Value::String(r#"{"active":true,"name":"Ada"}"#.to_owned())
         );
+    }
+
+    #[test]
+    fn json_to_object_ignores_comments_and_separator_lines() {
+        let result = execute_native_function(
+            NativeFunction::JsonToObject,
+            vec![Value::String(
+                "---\n{\n  // app name\n  \"name\": \"Ada\",\n  # enabled\n  \"active\": true,\n  /* points */\n  \"scores\": [1, 2]\n}\n".to_owned(),
+            )],
+            |_callee, _args| -> Result<Value, RuntimeError> {
+                unreachable!("Json.jsonToObject does not call back")
+            },
+            |value| -> Result<Value, RuntimeError> { Ok(value) },
+        )
+        .expect("relaxed JSON should parse");
+
+        assert_eq!(
+            result,
+            Value::Record(BTreeMap::from([
+                ("active".to_owned(), Value::Boolean(true)),
+                ("name".to_owned(), Value::String("Ada".to_owned())),
+                (
+                    "scores".to_owned(),
+                    Value::Array(vec![Value::Number(1.0), Value::Number(2.0)]),
+                ),
+            ]))
+        );
+    }
+
+    #[test]
+    fn json_to_pretty_string_formats_nested_values() {
+        let result = execute_native_function(
+            NativeFunction::JsonToPrettyString,
+            vec![Value::Record(BTreeMap::from([
+                ("active".to_owned(), Value::Boolean(true)),
+                (
+                    "scores".to_owned(),
+                    Value::Array(vec![Value::Number(1.0), Value::Number(2.0)]),
+                ),
+            ]))],
+            |_callee, _args| -> Result<Value, RuntimeError> {
+                unreachable!("Json.jsonToPrettyString does not call back")
+            },
+            |value| -> Result<Value, RuntimeError> { Ok(value) },
+        )
+        .expect("Json.jsonToPrettyString should succeed");
+
+        assert_eq!(
+            result,
+            Value::String(
+                "{\n  \"active\": true,\n  \"scores\": [\n    1,\n    2\n  ]\n}".to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn logger_helpers_format_messages_and_pretty_json() {
+        let logger = logger_to_value(&LoggerConfig {
+            name: Some("app".to_owned()),
+            level: LoggerSeverity::Debug,
+            destination: LoggerDestination::Stdout,
+        });
+
+        assert_eq!(
+            format_logger_line(
+                &parse_logger_config(&logger, "Logger logger").expect("logger should parse"),
+                LoggerSeverity::Info,
+                "hello",
+            ),
+            "[app] INFO hello\n"
+        );
+
+        let pretty = stringify_json_value(
+            &Value::Record(BTreeMap::from([(
+                "name".to_owned(),
+                Value::String("Ada".to_owned()),
+            )])),
+            JsonFormat::Pretty,
+        )
+        .expect("pretty JSON should serialize");
+        assert_eq!(pretty, "{\n  \"name\": \"Ada\"\n}");
     }
 
     #[test]
@@ -1693,10 +2225,10 @@ mod tests {
     #[test]
     fn json_parse_reports_trailing_content() {
         let error = execute_native_function(
-            NativeFunction::JsonParse,
+            NativeFunction::JsonToObject,
             vec![Value::String("true false".to_owned())],
             |_callee, _args| -> Result<Value, RuntimeError> {
-                unreachable!("Json.parse does not call back")
+                unreachable!("Json.jsonToObject does not call back")
             },
             |value| -> Result<Value, RuntimeError> { Ok(value) },
         )
