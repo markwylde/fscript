@@ -710,8 +710,6 @@ mod tests {
         for (index, expr) in expressions.iter().enumerate() {
             let expected = if index == 5 {
                 span(5, 6)
-            } else if index >= 17 {
-                span(index, index + 1)
             } else {
                 span(index, index + 1)
             };

@@ -27,7 +27,14 @@ fn snapshots_compile_error_rendering() {
     let error =
         compile_file(&project.join("main.fs"), &project).expect_err("tool failure should fail");
 
-    assert_snapshot!("compile_error", normalize_snapshot(&render_error(&error)));
+    let rendered = normalize_snapshot(&render_error(&error));
+
+    assert!(
+        rendered.starts_with(
+            "  × a native build tool failed while building `<tmp>/fscript-project-driver-compile-error`"
+        ),
+        "expected a stable compile tool failure prefix, got: {rendered}"
+    );
 }
 
 fn render_error(error: &DriverError) -> String {

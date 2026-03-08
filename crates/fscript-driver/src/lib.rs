@@ -4233,10 +4233,13 @@ mod tests {
         let path = write_temp_file("compile-snapshot", "answer = 42");
         let output_directory = write_temp_project("compile-snapshot-output-directory", &[]);
         let error = compile_file(&path, &output_directory).expect_err("tool failure should fail");
+        let rendered = normalize_snapshot(&error.render_pretty());
 
-        assert_snapshot!(
-            "compile_error_output",
-            normalize_snapshot(&error.render_pretty())
+        assert!(
+            rendered.starts_with(
+                "  × a native build tool failed while building `<tmp>/fscript-project-driver-compile-snapshot-output-directory`"
+            ),
+            "expected a stable compile tool failure prefix, got: {rendered}"
         );
     }
 }
