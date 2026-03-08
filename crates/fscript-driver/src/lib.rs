@@ -3579,6 +3579,39 @@ mod tests {
     }
 
     #[test]
+    fn compile_file_uses_native_runtime_calls_for_the_filesystem_example() {
+        let source_path = fscript_test_support::example_path("filesystem.fs");
+        let run_summary = run_file(&source_path).expect("filesystem example should run");
+        let output_path = temp_output_path("compiled-filesystem-example");
+
+        compile_file(&source_path, &output_path).expect("filesystem example should compile");
+
+        let output = std::process::Command::new(&output_path)
+            .output()
+            .expect("compiled filesystem example should run");
+        let bytes = fs::read(&output_path).expect("compiled filesystem binary should be readable");
+
+        let _ = fs::remove_file(&output_path);
+
+        assert!(output.status.success());
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout),
+            format!(
+                "{}\n",
+                run_summary
+                    .last_value
+                    .expect("the filesystem example should produce a final value")
+            )
+        );
+        assert!(!bytes
+            .windows("program-image.json".len())
+            .any(|window| window == b"program-image.json"));
+        assert!(!bytes
+            .windows("fscript-compile-runner".len())
+            .any(|window| window == b"fscript-compile-runner"));
+    }
+
+    #[test]
     fn compile_file_reports_tool_failures_without_source_spans() {
         let path = write_temp_file("compile-tool-failure", "answer = 42");
         let output_directory = write_temp_project("compile-output-directory", &[]);

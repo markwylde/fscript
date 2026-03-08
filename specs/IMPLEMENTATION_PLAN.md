@@ -723,9 +723,11 @@ Current backend parity table:
 | `std:string` | `trim`, `uppercase`, `lowercase`, `isDigits` | embedded runner |
 | `std:number` | `parse` | embedded runner |
 | `std:result` | `ok`, `error`, `isOk`, `isError`, `withDefault` | embedded runner |
-| `std:json` | `jsonToObject`, `jsonToString`, `jsonToPrettyString` | embedded runner |
+| `std:json` | `jsonToObject`, `jsonToString` | embedded runner |
+| `std:json` | `jsonToPrettyString` | native via runtime call |
 | `std:logger` | `create`, `log`, `debug`, `info`, `warn`, `error`, `prettyJson` | embedded runner |
-| `std:filesystem` | `readFile`, `writeFile`, `exists`, `deleteFile`, `readDir` | embedded runner |
+| `std:filesystem` | `readDir` | embedded runner |
+| `std:filesystem` | `readFile`, `writeFile`, `exists`, `deleteFile` | native via runtime call |
 | `std:task` | `all`, `race`, `spawn`, `defer`, `force` | embedded runner |
 | `std:http` | `serve` | embedded runner |
 
@@ -1669,11 +1671,14 @@ Additional coverage note: the last successful full `cargo llvm-cov --workspace -
 - [x] Define and document the stable native ABI between generated code and `fscript-runtime`.
 - [x] Choose and implement the native value representation strategy for primitives, strings, arrays, records, closures, generators, deferred handles, and task handles.
 - [ ] Expand native lowering beyond numeric-only code to cover strings, booleans, null, undefined, records, arrays, member access, index access, and structural equality.
+  - [x] Lower the first handle-backed native slice for strings, booleans, records, block expressions, and imported std member calls needed by `examples/filesystem.fs`.
 - [ ] Lower `if`, `match`, and destructuring through the native path with parity against the interpreter.
+  - [x] Lower `if` expressions through the native handle-backed slice for the current filesystem example parity target.
 - [ ] Lower user-defined functions, currying, partial application, and closures without interpreter participation.
 - [ ] Lower user-module imports/exports and once-per-module initialization entirely through the native path.
 - [ ] Lower pure generators to native generator frames with explicit resume state and parity tests.
 - [ ] Lower native `defer` and eager effect start through runtime-managed deferred/task handles instead of the embedded interpreter bridge.
+  - [x] Lower deferred `FileSystem.readFile` handles and eager filesystem host calls through native runtime shims for `examples/filesystem.fs`.
 - [ ] Add native scheduler parity coverage for dependency ordering, `Task.force`, `Task.all`, `Task.race`, and `Task.spawn`.
 - [ ] Move pure stdlib helpers onto native lowering or explicit runtime shims:
   - [ ] `std:array`
@@ -1686,8 +1691,11 @@ Additional coverage note: the last successful full `cargo llvm-cov --workspace -
   - [ ] `std:logger`
   - [ ] `std:filesystem`
   - [ ] `std:task`
+  - [x] Route `std:json` `jsonToPrettyString` through a native runtime call path.
+  - [x] Route `std:filesystem` `readFile`, `writeFile`, `exists`, and `deleteFile` through native runtime call paths.
 - [x] Add a backend parity table for every stdlib export and keep it updated until all supported exports are native-owned.
 - [ ] Make CI fail when examples expected to be native-owned route through the embedded-runner fallback.
+  - [x] Add a regression test asserting `examples/filesystem.fs` compiles without embedding the compile-runner program image.
 - [ ] Remove the embedded-runner bridge from successful default `fscript compile` output once native parity owns the supported surface.
 - [x] Add property tests with `proptest` for lexer, parser, and semantic invariants.
 - [x] Add snapshot tests for diagnostics and CLI output.

@@ -77,7 +77,7 @@ pub const STDLIB_BACKEND_PARITY: [StdlibBackendStatus; NativeFunction::ALL.len()
     ),
     stdlib_backend_status(
         NativeFunction::JsonToPrettyString,
-        StdlibBackendOwner::EmbeddedRunner,
+        StdlibBackendOwner::NativeRuntimeCall,
     ),
     stdlib_backend_status(
         NativeFunction::LoggerCreate,
@@ -109,19 +109,19 @@ pub const STDLIB_BACKEND_PARITY: [StdlibBackendStatus; NativeFunction::ALL.len()
     ),
     stdlib_backend_status(
         NativeFunction::FilesystemReadFile,
-        StdlibBackendOwner::EmbeddedRunner,
+        StdlibBackendOwner::NativeRuntimeCall,
     ),
     stdlib_backend_status(
         NativeFunction::FilesystemWriteFile,
-        StdlibBackendOwner::EmbeddedRunner,
+        StdlibBackendOwner::NativeRuntimeCall,
     ),
     stdlib_backend_status(
         NativeFunction::FilesystemExists,
-        StdlibBackendOwner::EmbeddedRunner,
+        StdlibBackendOwner::NativeRuntimeCall,
     ),
     stdlib_backend_status(
         NativeFunction::FilesystemDeleteFile,
-        StdlibBackendOwner::EmbeddedRunner,
+        StdlibBackendOwner::NativeRuntimeCall,
     ),
     stdlib_backend_status(
         NativeFunction::FilesystemReadDir,
@@ -553,12 +553,17 @@ mod tests {
     }
 
     #[test]
-    fn stdlib_backend_parity_reports_embedded_runner_ownership_today() {
+    fn stdlib_backend_parity_reports_current_ownership() {
         for status in STDLIB_BACKEND_PARITY {
-            assert_eq!(
-                stdlib_backend_owner(status.module, status.export),
-                Some(StdlibBackendOwner::EmbeddedRunner)
-            );
+            let expected = match (status.module, status.export) {
+                ("std:json", "jsonToPrettyString")
+                | ("std:filesystem", "readFile")
+                | ("std:filesystem", "writeFile")
+                | ("std:filesystem", "exists")
+                | ("std:filesystem", "deleteFile") => StdlibBackendOwner::NativeRuntimeCall,
+                _ => StdlibBackendOwner::EmbeddedRunner,
+            };
+            assert_eq!(stdlib_backend_owner(status.module, status.export), Some(expected));
         }
     }
 
