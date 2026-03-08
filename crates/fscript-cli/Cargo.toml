@@ -1,0 +1,18 @@
+[package]
+name = "fscript-cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+camino.workspace = true
+clap.workspace = true
+miette.workspace = true
+fscript-driver = { path = "../fscript-driver" }
+
+[dev-dependencies]
+fscript-test-support = { path = "../fscript-test-support" }
+insta.workspace = true
+
+[[bin]]
+name = "fscript"
+path = "src/main.rs"

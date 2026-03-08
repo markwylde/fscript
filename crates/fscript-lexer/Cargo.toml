@@ -1,0 +1,12 @@
+[package]
+name = "fscript-lexer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+camino.workspace = true
+fscript-source = { path = "../fscript-source" }
+
+[dev-dependencies]
+insta.workspace = true
+proptest.workspace = true

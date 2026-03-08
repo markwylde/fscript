@@ -1,0 +1,11 @@
+[package]
+name = "fscript-std"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fscript-runtime = { path = "../fscript-runtime" }
+
+[dev-dependencies]
+fscript-ir = { path = "../fscript-ir" }
+fscript-source = { path = "../fscript-source" }

@@ -1,0 +1,21 @@
+{
+  "name": "web",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "build:wasm": "DOCS_DIR=$(pwd) && cd .. && wasm-pack build crates/fscript-wasm --target web --out-dir \"$DOCS_DIR/src/generated/fscript-wasm\" --out-name fscript_wasm",
+    "dev": "npm run build:wasm && astro dev",
+    "start": "astro dev",
+    "build": "npm run build:wasm && astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.6",
+    "@astrojs/starlight": "^0.31.1",
+    "astro": "^5.0.0",
+    "monaco-editor": "^0.52.2",
+    "sharp": "^0.33.5",
+    "typescript": "^5.9.3"
+  }
+}

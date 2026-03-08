@@ -1,0 +1,27 @@
+[package]
+name = "fscript-driver"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+camino.workspace = true
+miette.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+fscript-ast = { path = "../fscript-ast" }
+fscript-codegen-cranelift = { path = "../fscript-codegen-cranelift" }
+fscript-effects = { path = "../fscript-effects" }
+fscript-hir = { path = "../fscript-hir" }
+fscript-interpreter = { path = "../fscript-interpreter" }
+fscript-ir = { path = "../fscript-ir" }
+fscript-lexer = { path = "../fscript-lexer" }
+fscript-lower = { path = "../fscript-lower" }
+fscript-parser = { path = "../fscript-parser" }
+fscript-runtime = { path = "../fscript-runtime" }
+fscript-source = { path = "../fscript-source" }
+fscript-std = { path = "../fscript-std" }
+fscript-types = { path = "../fscript-types" }
+
+[dev-dependencies]
+fscript-test-support = { path = "../fscript-test-support" }
+insta.workspace = true

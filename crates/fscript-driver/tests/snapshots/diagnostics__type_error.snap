@@ -1,0 +1,8 @@
+---
+source: crates/fscript-driver/tests/diagnostics.rs
+expression: normalize_snapshot(&render_error(&error))
+---
+  × expected Number but found String
+    at <tmp>/fscript-driver-type-error.fs:1:9
+    1 | greet = (name: String): Number => 'hello, ' + name
+      |         ^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch here

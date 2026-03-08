@@ -1,0 +1,11 @@
+[package]
+name = "fscript-runtime"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fscript-ir = { path = "../fscript-ir" }
+thiserror.workspace = true
+
+[dev-dependencies]
+fscript-source = { path = "../fscript-source" }

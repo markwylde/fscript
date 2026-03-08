@@ -1,0 +1,14 @@
+# Rust build output
+/target/
+
+# Docs app dependencies and build output
+/docs/node_modules/
+/docs/dist/
+/docs/.astro/
+
+# Environment files
+.env
+.env.*
+
+# macOS files
+.DS_Store

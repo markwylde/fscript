@@ -1,0 +1,49 @@
+---
+import type { Props } from '@astrojs/starlight/props';
+import Default from '@astrojs/starlight/components/SiteTitle.astro';
+
+---
+
+<div class="site-title-wrapper">
+  <Default {...Astro.props} />
+  
+  <nav class="top-nav">
+    <a href="/introduction/overview/" class="nav-link">Docs</a>
+    <a href="/sandbox/" class="nav-link">Sandbox</a>
+  </nav>
+</div>
+
+<style>
+  .site-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .top-nav {
+    display: none;
+    gap: 1.5rem;
+    margin-left: 1rem;
+    border-left: 1px solid var(--sl-color-gray-5);
+    padding-left: 1.5rem;
+  }
+
+  .nav-link {
+    color: var(--sl-color-gray-3);
+    text-decoration: none;
+    font-size: var(--sl-text-sm);
+    font-weight: 500;
+    transition: color 0.2s ease;
+  }
+
+  .nav-link:hover {
+    color: var(--sl-color-accent-high);
+  }
+
+  /* Only show on desktop to avoid crowding the mobile header */
+  @media (min-width: 50rem) {
+    .top-nav {
+      display: flex;
+    }
+  }
+</style>

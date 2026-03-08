@@ -1,0 +1,50 @@
+---
+title: FScript
+description: A small functional typed language with immutable data and async-by-semantics execution.
+template: splash
+hero:
+  tagline: Modern functional programming with the familiarity of TypeScript, minus the complexity.
+  image:
+    file: ../../assets/logo.svg
+  actions:
+    - text: Get Started
+      link: /getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: Try it in the Playground
+      link: /sandbox/
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why FScript?
+
+<CardGrid staggered>
+	<Card title="Purely Functional" icon="pencil">
+		Immutable bindings, arrow functions only, and no classes. Focus on data transformation.
+	</Card>
+	<Card title="Type Safe" icon="add-document">
+		Strong inference, tagged unions, and pattern matching inspired by the best of TypeScript and Rust.
+	</Card>
+	<Card title="Runtime Power" icon="setting">
+		Explicit `std:` modules and `defer` for laziness. Designed for predictable execution.
+	</Card>
+	<Card title="Painless Tooling" icon="rocket">
+		Native Rust-based compiler and CLI. No complex build pipelines required.
+	</Card>
+</CardGrid>
+
+```fs
+import Array from 'std:array'
+
+// FScript feels familiar, but stays pure.
+users = [
+  { name: 'Alice', active: true },
+  { name: 'Bob', active: false }
+]
+
+activeNames = users
+  |> Array.filter((u) => u.active)
+  |> Array.map((u) => u.name)
+```

@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 755b1e61f1fdcd38aa37cc1f55cbd0fea2e27763009df2e5c74aaa24885fe781 # shrinks to items = ["_ = _", "_ = _"]
+cc 0cf6a406f11a7cd0065017f52a97f894b7f8439644db8cd2c9015b74ece7179e # shrinks to (module_text, expected_items) = ("_ = _\n[_] = _", 2)

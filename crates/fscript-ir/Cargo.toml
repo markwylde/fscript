@@ -1,0 +1,8 @@
+[package]
+name = "fscript-ir"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fscript-source = { path = "../fscript-source" }
+serde.workspace = true

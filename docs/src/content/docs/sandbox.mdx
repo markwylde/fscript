@@ -1,0 +1,29 @@
+---
+title: Sandbox
+description: Try FScript in your browser.
+template: splash
+prev: false
+next: false
+editUrl: false
+lastUpdated: false
+---
+
+import Sandbox from '../../components/Sandbox.astro';
+
+<Sandbox initialCode={`import Array from 'std:array'
+
+// Welcome to the FScript Sandbox!
+// Edit the program, then press Run.
+// The output panel shows the value of the last binding.
+
+users = [
+    { username: 'alice', active: false },
+    { username: 'bob', active: true },
+    { username: 'charlie', active: false },
+    { username: 'diana', active: true },
+    { username: 'eve', active: false }
+]
+
+result = users
+    |> Array.filter((user: { username: String, active: Boolean }): Boolean => user.active)
+    |> Array.map((user: { username: String, active: Boolean }): String => user.username)`} />

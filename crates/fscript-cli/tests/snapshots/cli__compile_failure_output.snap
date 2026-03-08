@@ -1,0 +1,8 @@
+---
+source: crates/fscript-cli/tests/cli.rs
+expression: "normalize_snapshot(&String::from_utf8_lossy(&output.stderr))"
+---
+  × expected `else` after an `if` block
+    at <tmp>/fscript-project-cli-compile-failure/main.fs:1:25
+    1 | answer = if (true) { 1 }
+      |                         ^ unexpected here

@@ -1,0 +1,15 @@
+[package]
+name = "fscript-parser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+camino.workspace = true
+fscript-ast = { path = "../fscript-ast" }
+fscript-lexer = { path = "../fscript-lexer" }
+fscript-source = { path = "../fscript-source" }
+
+[dev-dependencies]
+fscript-test-support = { path = "../fscript-test-support" }
+insta.workspace = true
+proptest.workspace = true

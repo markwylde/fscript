@@ -1,0 +1,17 @@
+---
+source: crates/fscript-cli/src/main.rs
+expression: "String::from_utf8(help).expect(\"help output should be utf-8\")"
+---
+FScript compiler and tooling
+
+Usage: fscript [COMMAND]
+
+Commands:
+  check    Typecheck and validate a source file
+  run      Run an FScript entrypoint
+  compile  Compile an FScript entrypoint to a native executable
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help
+          Print help

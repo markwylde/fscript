@@ -1,0 +1,8 @@
+---
+source: crates/fscript-driver/src/lib.rs
+expression: normalize_snapshot(&error.render_pretty())
+---
+  × a native build tool failed while building `<tmp>/fscript-project-driver-compile-snapshot-output-directory`
+ld: warning: no platform load command found in '<tmp>/fscript-compile/program.o', assuming: macOS
+ld: open() failed, errno=21 for '<tmp>/fscript-project-driver-compile-snapshot-output-directory'
+clang: error: linker command failed with exit code 1 (use -v to see invocation)

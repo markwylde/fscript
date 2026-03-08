@@ -1,0 +1,16 @@
+[package]
+name = "fscript-lower"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror.workspace = true
+fscript-ast = { path = "../fscript-ast" }
+fscript-hir = { path = "../fscript-hir" }
+fscript-ir = { path = "../fscript-ir" }
+fscript-source = { path = "../fscript-source" }
+
+[dev-dependencies]
+camino.workspace = true
+fscript-lexer = { path = "../fscript-lexer" }
+fscript-parser = { path = "../fscript-parser" }

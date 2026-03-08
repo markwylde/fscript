@@ -1,0 +1,17 @@
+[package]
+name = "fscript-codegen-cranelift"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+camino.workspace = true
+cranelift-codegen.workspace = true
+cranelift-frontend.workspace = true
+cranelift-module.workspace = true
+cranelift-native.workspace = true
+cranelift-object.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+fscript-ir = { path = "../fscript-ir" }
+fscript-source = { path = "../fscript-source" }

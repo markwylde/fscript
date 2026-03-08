@@ -1,0 +1,12 @@
+[package]
+name = "fscript-compile-runner"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fscript-interpreter = { path = "../fscript-interpreter" }
+fscript-ir = { path = "../fscript-ir" }
+serde_json.workspace = true
+
+[dev-dependencies]
+fscript-source = { path = "../fscript-source" }

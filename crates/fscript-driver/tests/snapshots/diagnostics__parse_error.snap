@@ -1,0 +1,8 @@
+---
+source: crates/fscript-driver/tests/diagnostics.rs
+expression: normalize_snapshot(&render_error(&error))
+---
+  × expected `=` after a binding pattern
+    at <tmp>/fscript-driver-parse-error.fs:1:9
+    1 | message 'hello'
+      |         ^^^^^^^ unexpected here

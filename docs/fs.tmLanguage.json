@@ -1,0 +1,55 @@
+{
+  "name": "fscript",
+  "scopeName": "source.fs",
+  "patterns": [
+    {
+      "name": "comment.line.double-slash.fs",
+      "match": "//.*$"
+    },
+    {
+      "name": "comment.block.fs",
+      "begin": "/\\*",
+      "end": "\\*/"
+    },
+    {
+      "name": "string.quoted.single.fs",
+      "begin": "'",
+      "end": "'",
+      "patterns": [{ "name": "constant.character.escape.fs", "match": "\\\\." }]
+    },
+    {
+      "name": "string.quoted.double.fs",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "name": "constant.character.escape.fs", "match": "\\\\." }]
+    },
+    {
+      "name": "keyword.control.fs",
+      "match": "\\b(if|else|match|try|catch|throw|import|from|export|yield|defer|return)\\b"
+    },
+    {
+      "name": "keyword.other.fs",
+      "match": "\\b(type|as)\\b"
+    },
+    {
+      "name": "storage.type.fs",
+      "match": "\\b(String|Boolean|Number|Array|Result|Task|Void|Never|Any|Unknown)\\b"
+    },
+    {
+      "name": "constant.language.fs",
+      "match": "\\b(true|false|null|undefined)\\b"
+    },
+    {
+      "name": "variable.other.constant.fs",
+      "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+    },
+    {
+      "name": "entity.name.function.fs",
+      "match": "\\b[a-z][a-zA-Z0-9_]*(?=\\s*[:=]?\\s*\\([^)]*\\)\\s*=>)"
+    },
+    {
+      "name": "keyword.operator.fs",
+      "match": "(\\|>|=>|\\.\\.\\.|==|!=|<=|>=|<|>|\\+|-|\\*|/|%|=|&&|\\|\\||!)"
+    }
+  ]
+}
