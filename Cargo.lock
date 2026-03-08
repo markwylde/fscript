@@ -455,6 +455,7 @@ dependencies = [
  "cranelift-native",
  "cranelift-object",
  "fscript-ir",
+ "fscript-runtime",
  "fscript-source",
  "serde",
  "serde_json",

@@ -255,6 +255,7 @@ Examples:
 
 - `std:filesystem`
 - `std:json`
+- `std:logger`
 - `std:array`
 - `std:object`
 - `std:result`
@@ -265,6 +266,12 @@ Runtime responsibilities:
 - register built-in modules
 - expose native host implementations safely
 - keep host boundaries narrow and typed where possible
+
+Additional host-boundary requirements for Draft 0.1:
+
+- `std:json` parsing must support relaxed comment-tolerant input for configuration-style files
+- `std:logger` must write to the process terminal without depending on JavaScript console APIs
+- pretty-printed JSON output should be stable so logs and snapshots remain predictable
 
 ## 13. Host Boundaries
 
@@ -277,6 +284,7 @@ Examples:
 - clock/time
 - randomness
 - network IO
+- terminal logging
 
 Rules:
 

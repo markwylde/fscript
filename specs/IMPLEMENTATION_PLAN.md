@@ -25,6 +25,7 @@ This plan should be read alongside:
 - [TYPESYSTEM.md](/Users/markwylde/Documents/Projects/fscript/specs/TYPESYSTEM.md)
 - [RUNTIME.md](/Users/markwylde/Documents/Projects/fscript/specs/RUNTIME.md)
 - [STDLIB.md](/Users/markwylde/Documents/Projects/fscript/specs/STDLIB.md)
+- [NATIVE_ABI.md](/Users/markwylde/Documents/Projects/fscript/specs/NATIVE_ABI.md)
 - [CODE_STYLE.md](/Users/markwylde/Documents/Projects/fscript/specs/CODE_STYLE.md)
 
 The project should be built in layers so we get a working language quickly, then harden it without architectural rewrites.
@@ -53,6 +54,7 @@ Implemented today:
 - `fscript run` executing the shipped example set through the semantic frontend plus shared IR/interpreter path
 - a bootstrap native compiler backend that now emits standalone executables from the shared IR program graph, not just a single lowered module
 - a first bounded real Cranelift backend slice for the numeric single-module subset that lowers shared IR to Cranelift IR, emits native object files, and links executables through the system toolchain plus a tiny runtime-print shim
+- that bounded Cranelift slice now crosses the native boundary through runtime-owned value handles for its final numeric results instead of an ad hoc raw-`double` print helper, aligning the shipped subset with the documented Draft 0.1 ABI direction
 - a fixed interpreter-backed embedded-runner compile bridge that packages the shared IR graph into emitted executables so compiled programs can inherit imports, functions, generators, `try/catch`, `throw`, `defer`, user modules, and the current shared-runtime stdlib surface from the active `run` path without generating ad hoc Rust source per program
 - the mixed compile pipeline still includes the earlier plain-data/control-flow slice for literals, blocks, records, arrays, non-`defer` unary operators, `if`, structural equality, member access, and index access, and now has broader parity tests against `run`
 
@@ -638,6 +640,23 @@ Key design goals:
 - runtime allocations are visible and measurable
 - host boundaries are narrow and explicit
 
+Native-runtime work required before the embedded runner can be retired:
+
+- define a stable runtime ABI between Cranelift-generated code and `fscript-runtime` for values, closures, generators, deferred handles, task handles, throws, and module records
+- split the current runtime contract into two tiers:
+  - a low-level native ABI callable from generated code
+  - a higher-level Rust convenience API used by the interpreter and stdlib tests
+- decide and document the native ownership model for values that cross generated-code boundaries so closures, generators, deferred tasks, arrays, and records can outlive individual stack frames safely
+- make module initialization runtime-visible in the native path so compiled executables preserve the same once-per-module semantics, dependency ordering, and cycle rejection as `run`
+- extend the scheduler so native-generated effectful code can create, wait on, resume, and force runtime work without going back through the interpreter
+- add runtime conformance tests that execute the same scenarios through interpreter entrypoints and native ABI entrypoints
+
+Current Draft 0.1 ABI choice:
+
+- stable runtime boundary: opaque runtime-owned handles for every value category
+- optimized internal lowering may still use unboxed primitives inside generated code for hot pure paths
+- current shared metadata for that contract lives in `fscript-runtime`, and the narrative contract is documented in [NATIVE_ABI.md](/Users/markwylde/Documents/Projects/fscript/specs/NATIVE_ABI.md)
+
 ## 12. Standard Library Plan
 
 This section should follow [STDLIB.md](/Users/markwylde/Documents/Projects/fscript/specs/STDLIB.md).
@@ -652,6 +671,7 @@ Required early modules:
 - `std:number`
 - `std:result`
 - `std:json`
+- `std:logger`
 - `std:filesystem`
 - `std:task`
 
@@ -671,6 +691,43 @@ Before implementing host functions we should define:
 - whether failures surface as `Result` values or exceptional runtime failures
 - the runtime registration interface used by interpreter and codegen
 - conformance tests that assert stable signatures and semantics
+
+Native-compile follow-up required for stdlib parity:
+
+- classify every exported stdlib function as one of:
+  - direct pure intrinsic lowered inline or via a tiny runtime helper
+  - runtime call with no suspension
+  - scheduler-aware effectful runtime call
+- implement the pure/native-first stdlib surface in the Cranelift path before growing fallback-dependent examples:
+  - `std:array`: `length`, `append`, `concat`, `at`, `slice`, then `map`/`filter`/`reduce`/`flatMap`
+  - `std:object`: `spread`, `keys`, `values`, `entries`, `has`, `get`, `set`
+  - `std:string`: `length`, `uppercase`, `lowercase`, `trim`, `split`, `join`, `startsWith`, `endsWith`, `contains`, `isDigits`
+  - `std:number`: `parse`, `toString`, `floor`, `ceil`, `round`, `min`, `max`, `clamp`
+  - `std:result`: constructors and structural helpers, then higher-order helpers like `map`, `mapError`, `andThen`
+- implement the host-boundary stdlib surface through explicit runtime calls with native tests for:
+  - `std:json`
+  - `std:logger`
+  - `std:filesystem`
+  - `std:task`
+- add a backend-owned parity matrix for every stdlib export so each function is marked as:
+  - interpreter-only
+  - native via runtime call
+  - native lowered/inlined
+
+Current backend parity table:
+
+| Module | Export | Current compile owner |
+| --- | --- | --- |
+| `std:array` | `map`, `filter`, `length` | embedded runner |
+| `std:object` | `spread` | embedded runner |
+| `std:string` | `trim`, `uppercase`, `lowercase`, `isDigits` | embedded runner |
+| `std:number` | `parse` | embedded runner |
+| `std:result` | `ok`, `error`, `isOk`, `isError`, `withDefault` | embedded runner |
+| `std:json` | `jsonToObject`, `jsonToString`, `jsonToPrettyString` | embedded runner |
+| `std:logger` | `create`, `log`, `debug`, `info`, `warn`, `error`, `prettyJson` | embedded runner |
+| `std:filesystem` | `readFile`, `writeFile`, `exists`, `deleteFile`, `readDir` | embedded runner |
+| `std:task` | `all`, `race`, `spawn`, `defer`, `force` | embedded runner |
+| `std:http` | `serve` | embedded runner |
 
 ## 13. Interpreter Plan
 
@@ -712,6 +769,7 @@ Current repository note:
 - the older generated Rust-source bootstrap compiler has been removed
 - the next honest native-compilation milestone is therefore not "finish codegen" in one jump, but to keep expanding the real Cranelift-owned subset while the embedded runner preserves broader parity
 - those stages should be visible in the checklist so backend progress can be tracked without overstating parity
+- the target end state for Draft 0.1 is that the embedded-runner path is removed from normal `fscript compile` output, not merely hidden behind a best-effort fallback
 
 Recommended backend:
 
@@ -736,16 +794,128 @@ Native compilation goals:
 - no JavaScript runtime dependency
 - predictable execution
 - simple debug info story first, better debug info later
+- interpreter/native semantic parity through one shared IR/runtime contract
+- no interpreter payload embedded in ordinary compiled executables
 
-### 14.1 Bounded backend replacement plan
+Required native backend expansion tracks:
+
+1. Runtime ABI and value model
+2. Pure IR lowering
+3. Control-flow lowering
+4. Function and closure lowering
+5. Aggregate data lowering
+6. Generator lowering
+7. Deferred/task/effect lowering
+8. User-module initialization and linking
+9. Stdlib parity and host-boundary calls
+10. Embedded-runner retirement
+
+### 14.1 Native parity work breakdown
+
+Track A: runtime ABI, calling convention, and ownership
+
+- define the concrete ABI used by generated code for:
+  - numbers, booleans, null, undefined
+  - heap values such as strings, arrays, records, closures, generators, deferred handles, and task handles
+  - function entrypoints, curried partial applications, and native stdlib call shims
+  - thrown-value propagation and catch boundaries
+- document whether the native path will use:
+  - a boxed tagged `Value`
+  - partially unboxed primitives plus boxed aggregates
+  - a hybrid ABI with specialized signatures for hot pure paths
+- add ABI-level tests that compile tiny generated stubs and assert round-tripping through runtime helpers
+
+Track B: pure expression lowering
+
+- expand the current numeric-only lowering to support:
+  - strings
+  - booleans
+  - null and undefined
+  - structural equality
+  - records
+  - arrays
+  - member access
+  - index access
+  - `if`
+  - `match`
+  - destructuring
+- keep unsupported forms failing in the frontend/codegen boundary with source-local diagnostics instead of silently falling back when the plan says a construct should now be native-owned
+
+Track C: functions, currying, and closures
+
+- lower user-defined function values into native callable objects
+- lower partial application without routing through the interpreter
+- preserve closure capture semantics and immutable environments
+- add native parity tests for:
+  - direct calls
+  - partial application
+  - higher-order stdlib calls
+  - nested closures
+  - cross-module function imports and exports
+
+Track D: generators
+
+- define a native generator frame layout that matches the runtime spec:
+  - instruction pointer/state index
+  - captured locals
+  - yielded value slot
+  - completion flag
+- lower `yield` and resume points into explicit generator state machines
+- ensure generators remain pure-lazy and reject effectful generator work in the same places as the interpreter
+- add parity tests for creation, stepping, exhaustion, and captured-environment behavior
+
+Track E: deferred work, tasks, and eager effects
+
+- lower native `defer` into runtime-managed deferred handles instead of interpreter-only deferred bodies
+- lower eager effect start into explicit scheduler/task creation at reach-time
+- preserve the ordering rules from `LANGUAGE.md` and `RUNTIME.md` for:
+  - eager effect start
+  - dependency-driven suspension
+  - forcing deferred work
+  - `Task.all`
+  - `Task.race`
+  - `Task.spawn`
+- add parity tests that compare observable ordering between `run` and native-compiled binaries
+
+Track F: modules and linking
+
+- lower the full loaded IR module graph into native-owned module initialization functions
+- emit one native initialization unit per source module or an equivalent linked plan with deterministic init ordering
+- preserve:
+  - once-per-module top-level execution
+  - import dependency ordering
+  - user-module exports
+  - std-module imports
+  - circular import rejection before execution
+- add compile-time fixtures with multiple user modules, re-exports, and mixed std/user imports
+
+Track G: stdlib parity
+
+- move pure stdlib helpers off the interpreter-backed path first
+- then move scheduler-aware host functions onto explicit runtime call shims
+- keep `Unknown`-producing and host-validation behavior concentrated at boundary APIs such as JSON and filesystem
+- add one parity table in this plan mapping each stdlib export to its backend status until the table is empty
+
+Track H: removing the embedded runner
+
+- add an opt-in debug escape hatch if needed, but stop treating the embedded runner as the default success path for `compile`
+- fail CI if a program expected to be native-owned still routes through the embedded-runner bridge
+- delete the bridge only after:
+  - native parity covers all supported examples
+  - backend error diagnostics remain snapshot-stable
+  - compiled executables no longer include the interpreter/program-image payload
+### 14.2 Bounded backend replacement plan
 
 Replace the bootstrap compiler in small, testable stages:
 
 1. implement Cranelift lowering for the current pure parity subset of IR
 2. emit native object files directly with `cranelift-module` and `cranelift-object`
 3. link those objects into executables through the driver
-4. expand the Cranelift-supported subset until it matches the interpreter-supported compile subset
-5. remove the Rust-source bootstrap backend only after the Cranelift path owns the same tests
+4. expand the Cranelift-supported subset through pure aggregates, control flow, and structural equality
+5. lower user functions, currying, and closures without interpreter participation
+6. lower generators, deferred values, eager effects, and scheduler-aware stdlib calls
+7. lower the full module graph and stdlib imports to the native runtime contract
+8. remove the embedded-runner bridge only after the Cranelift path owns the same tests and emitted binaries no longer embed the interpreter payload
 
 The first Cranelift landing should stay intentionally narrow:
 
@@ -1106,7 +1276,8 @@ Language and runtime features exercised:
 - user-module imports across a small project
 - arrays, records, and immutable updates
 - `std:filesystem` for persistence
-- `std:json` for parse and stringify boundaries
+- `std:json` for `jsonToObject` / `jsonToString` boundaries, including comment-tolerant config files
+- `std:logger` for operator-facing terminal output and pretty JSON inspection
 - `std:result` for recoverable errors
 - pipe syntax for list formatting and transformations
 - explicit exported return types on public helpers
@@ -1115,7 +1286,7 @@ Why this project matters:
 
 - it maps closely to how many users evaluate a new language: can I build a small tool that reads data, transforms it, and writes it back safely?
 - it is realistic without requiring network support
-- it should become the main regression fixture for `std:filesystem` plus `std:json`
+- it should become the main regression fixture for `std:filesystem`, `std:json`, and `std:logger`
 
 Acceptance criteria:
 
@@ -1326,11 +1497,14 @@ Deliver:
 
 Deliver:
 
-- Cranelift lowering
-- object emission
-- executable linking
-- `fscript compile`
-- interpreter/codegen parity tests
+- a documented native runtime ABI shared by `fscript-runtime` and `fscript-codegen-cranelift`
+- Cranelift lowering for the current pure subset plus strings, aggregates, control flow, and structural equality
+- native lowering for user-defined functions, currying, and closures
+- native generator frames and resume logic
+- native deferred/task/effect lowering against the shared scheduler/runtime contract
+- native module-graph initialization and stdlib import wiring
+- backend-owned parity coverage for every supported example
+- removal of the embedded-runner default path from ordinary successful `fscript compile`
 
 ### Milestone 9: hardening
 
@@ -1407,7 +1581,7 @@ Mitigation:
 FScript v0.1 is done when all of the following are true:
 
 - `fscript run` works for the language subset described by `specs/LANGUAGE.md`, `specs/GRAMMAR.md`, `specs/TYPESYSTEM.md`, `specs/RUNTIME.md`, and `specs/STDLIB.md`
-- `fscript compile` emits native executables for the supported subset
+- `fscript compile` emits native executables for the same supported subset without embedding the interpreter-backed compile runner
 - ill-typed programs are rejected before execution
 - examples folder contains at least 10 runnable apps
 - every example is covered by automated tests
@@ -1470,6 +1644,8 @@ Additional coverage note: the last successful full `cargo llvm-cov --workspace -
 - [x] Implement `std:number`.
 - [x] Implement `std:result`.
 - [x] Implement `std:json`.
+- [x] Expand `std:json` with `jsonToObject`, `jsonToString`, `jsonToPrettyString`, and relaxed comment-tolerant parsing.
+- [x] Implement `std:logger`.
 - [x] Implement `std:filesystem`.
 - [x] Implement the current shared-runtime `std:task` subset (`Task.all`, `Task.defer`, `Task.force`).
 - [x] Expand the shared-runtime `std:task` surface with `Task.race` and `Task.spawn`.
@@ -1490,6 +1666,29 @@ Additional coverage note: the last successful full `cargo llvm-cov --workspace -
 - [x] Link emitted objects with the runtime to produce executables for `fscript compile`.
 - [x] Remove the bootstrap Rust-source compiler backend once the IR plus Cranelift pipeline is ready.
 - [x] Add interpreter vs compiled parity tests.
+- [x] Define and document the stable native ABI between generated code and `fscript-runtime`.
+- [x] Choose and implement the native value representation strategy for primitives, strings, arrays, records, closures, generators, deferred handles, and task handles.
+- [ ] Expand native lowering beyond numeric-only code to cover strings, booleans, null, undefined, records, arrays, member access, index access, and structural equality.
+- [ ] Lower `if`, `match`, and destructuring through the native path with parity against the interpreter.
+- [ ] Lower user-defined functions, currying, partial application, and closures without interpreter participation.
+- [ ] Lower user-module imports/exports and once-per-module initialization entirely through the native path.
+- [ ] Lower pure generators to native generator frames with explicit resume state and parity tests.
+- [ ] Lower native `defer` and eager effect start through runtime-managed deferred/task handles instead of the embedded interpreter bridge.
+- [ ] Add native scheduler parity coverage for dependency ordering, `Task.force`, `Task.all`, `Task.race`, and `Task.spawn`.
+- [ ] Move pure stdlib helpers onto native lowering or explicit runtime shims:
+  - [ ] `std:array`
+  - [ ] `std:object`
+  - [ ] `std:string`
+  - [ ] `std:number`
+  - [ ] `std:result`
+- [ ] Move host-boundary stdlib helpers onto native runtime shims with parity coverage:
+  - [ ] `std:json`
+  - [ ] `std:logger`
+  - [ ] `std:filesystem`
+  - [ ] `std:task`
+- [x] Add a backend parity table for every stdlib export and keep it updated until all supported exports are native-owned.
+- [ ] Make CI fail when examples expected to be native-owned route through the embedded-runner fallback.
+- [ ] Remove the embedded-runner bridge from successful default `fscript compile` output once native parity owns the supported surface.
 - [x] Add property tests with `proptest` for lexer, parser, and semantic invariants.
 - [x] Add snapshot tests for diagnostics and CLI output.
 - [x] Stabilize compile-error snapshot normalization across backend temp-directory naming so diagnostics and coverage snapshots stay deterministic.

@@ -179,6 +179,7 @@ docs/content/
     number.md
     result.md
     json.md
+    logger.md
     filesystem.md
     task.md
   cli/
@@ -566,4 +567,3 @@ The docs effort should be considered successful when:
 - the CLI docs are accurate for `check`, `run`, and `compile`
 - the site clearly separates spec intent from current implementation status
 - the Markdown content is ready to drop into an Astro docs project with minimal restructuring
-

@@ -11,17 +11,19 @@ Well-typed FScript code aims to avoid internal runtime type errors, but host bou
 
 - file input
 - JSON parsing
+- terminal logging
 - decoding external data
 - future native interop boundaries
 
 ## Practical Guidance
 
 - prefer `Result<T, E>` for expected failures
-- treat JSON and filesystem work as runtime boundaries
+- treat JSON, filesystem, and terminal logging work as runtime boundaries
 - do not assume external data is already typed program data
 
 ## Related Pages
 
 - [Errors](../language-guide/errors.md)
 - [std:json](../standard-library/json.md)
+- [std:logger](../standard-library/logger.md)
 - [std:filesystem](../standard-library/filesystem.md)

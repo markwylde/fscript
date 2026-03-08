@@ -35,6 +35,89 @@ impl RuntimeError {
 /// Runtime environment used by closures and deferred values.
 pub type Environment = BTreeMap<String, Value>;
 
+/// Stable native-ABI value categories shared by the runtime and codegen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeAbiValueKind {
+    Number,
+    String,
+    Boolean,
+    Null,
+    Undefined,
+    Record,
+    Array,
+    Sequence,
+    Closure,
+    Generator,
+    DeferredHandle,
+    TaskHandle,
+    NativeFunction,
+}
+
+/// Low-level storage classes available to the native backend.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeAbiStorage {
+    OpaqueHandle,
+    UnboxedF64,
+    UnboxedBool,
+    ImmediateTag,
+}
+
+/// Ownership model for values that cross the native ABI boundary.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeAbiOwnership {
+    RuntimeOwned,
+}
+
+/// Native ABI contract for one runtime value category.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NativeAbiValueSpec {
+    pub kind: NativeAbiValueKind,
+    pub stable_storage: NativeAbiStorage,
+    pub optimized_storage: NativeAbiStorage,
+    pub ownership: NativeAbiOwnership,
+}
+
+impl NativeAbiValueSpec {
+    /// Returns the ABI contract for the requested value category.
+    #[must_use]
+    pub const fn for_kind(kind: NativeAbiValueKind) -> Self {
+        match kind {
+            NativeAbiValueKind::Number => Self {
+                kind,
+                stable_storage: NativeAbiStorage::OpaqueHandle,
+                optimized_storage: NativeAbiStorage::UnboxedF64,
+                ownership: NativeAbiOwnership::RuntimeOwned,
+            },
+            NativeAbiValueKind::Boolean => Self {
+                kind,
+                stable_storage: NativeAbiStorage::OpaqueHandle,
+                optimized_storage: NativeAbiStorage::UnboxedBool,
+                ownership: NativeAbiOwnership::RuntimeOwned,
+            },
+            NativeAbiValueKind::Null | NativeAbiValueKind::Undefined => Self {
+                kind,
+                stable_storage: NativeAbiStorage::OpaqueHandle,
+                optimized_storage: NativeAbiStorage::ImmediateTag,
+                ownership: NativeAbiOwnership::RuntimeOwned,
+            },
+            NativeAbiValueKind::String
+            | NativeAbiValueKind::Record
+            | NativeAbiValueKind::Array
+            | NativeAbiValueKind::Sequence
+            | NativeAbiValueKind::Closure
+            | NativeAbiValueKind::Generator
+            | NativeAbiValueKind::DeferredHandle
+            | NativeAbiValueKind::TaskHandle
+            | NativeAbiValueKind::NativeFunction => Self {
+                kind,
+                stable_storage: NativeAbiStorage::OpaqueHandle,
+                optimized_storage: NativeAbiStorage::OpaqueHandle,
+                ownership: NativeAbiOwnership::RuntimeOwned,
+            },
+        }
+    }
+}
+
 /// Shared runtime values for interpreter and future codegen.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -52,6 +135,36 @@ pub enum Value {
 }
 
 impl Value {
+    /// Returns the native ABI category for this runtime value.
+    #[must_use]
+    pub const fn native_abi_kind(&self) -> NativeAbiValueKind {
+        match self {
+            Self::String(_) => NativeAbiValueKind::String,
+            Self::Number(_) => NativeAbiValueKind::Number,
+            Self::Boolean(_) => NativeAbiValueKind::Boolean,
+            Self::Null => NativeAbiValueKind::Null,
+            Self::Undefined => NativeAbiValueKind::Undefined,
+            Self::Record(_) => NativeAbiValueKind::Record,
+            Self::Array(_) => NativeAbiValueKind::Array,
+            Self::Sequence(_) => NativeAbiValueKind::Sequence,
+            Self::Deferred(_) => NativeAbiValueKind::DeferredHandle,
+            Self::Function(function) => {
+                if function.is_generator {
+                    NativeAbiValueKind::Generator
+                } else {
+                    NativeAbiValueKind::Closure
+                }
+            }
+            Self::NativeFunction(_) => NativeAbiValueKind::NativeFunction,
+        }
+    }
+
+    /// Returns the native ABI contract for this runtime value.
+    #[must_use]
+    pub const fn native_abi_spec(&self) -> NativeAbiValueSpec {
+        NativeAbiValueSpec::for_kind(self.native_abi_kind())
+    }
+
     /// Checks structural equality for plain comparable values.
     pub fn structural_eq(&self, other: &Self) -> Result<bool, RuntimeError> {
         match (self, other) {
@@ -102,6 +215,50 @@ impl Value {
             }
             _ => Ok(false),
         }
+    }
+}
+
+/// Opaque runtime-owned value handle used by the native ABI.
+pub type NativeAbiValueHandle = *mut Value;
+
+/// Boxes a numeric runtime value for the native ABI boundary.
+#[must_use]
+#[unsafe(no_mangle)]
+pub extern "C" fn fscript_value_from_number(value: f64) -> NativeAbiValueHandle {
+    Box::into_raw(Box::new(Value::Number(value)))
+}
+
+/// Prints a runtime value referenced by a native ABI handle.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live [`Value`] allocated by the runtime ABI helpers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_value_print(handle: *const Value) {
+    if handle.is_null() {
+        return;
+    }
+
+    // SAFETY: callers must pass a handle produced by the runtime ABI helpers.
+    let value = unsafe { &*handle };
+    println!("{value}");
+}
+
+/// Drops a runtime value referenced by a native ABI handle.
+///
+/// # Safety
+///
+/// `handle` must be null or an owned handle returned by the runtime ABI helpers, and it must
+/// not be used again after this function returns.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_value_drop(handle: NativeAbiValueHandle) {
+    if handle.is_null() {
+        return;
+    }
+
+    // SAFETY: callers must pass ownership of a handle produced by the runtime ABI helpers.
+    unsafe {
+        drop(Box::from_raw(handle));
     }
 }
 
@@ -493,8 +650,16 @@ pub enum NativeFunction {
     ArrayFilter,
     ArrayLength,
     HttpServe,
-    JsonParse,
-    JsonStringify,
+    JsonToObject,
+    JsonToString,
+    JsonToPrettyString,
+    LoggerCreate,
+    LoggerLog,
+    LoggerDebug,
+    LoggerInfo,
+    LoggerWarn,
+    LoggerError,
+    LoggerPrettyJson,
     FilesystemReadFile,
     FilesystemWriteFile,
     FilesystemExists,
@@ -518,6 +683,45 @@ pub enum NativeFunction {
 }
 
 impl NativeFunction {
+    /// Ordered list of runtime-backed stdlib exports.
+    pub const ALL: [Self; 35] = [
+        Self::ObjectSpread,
+        Self::ArrayMap,
+        Self::ArrayFilter,
+        Self::ArrayLength,
+        Self::HttpServe,
+        Self::JsonToObject,
+        Self::JsonToString,
+        Self::JsonToPrettyString,
+        Self::LoggerCreate,
+        Self::LoggerLog,
+        Self::LoggerDebug,
+        Self::LoggerInfo,
+        Self::LoggerWarn,
+        Self::LoggerError,
+        Self::LoggerPrettyJson,
+        Self::FilesystemReadFile,
+        Self::FilesystemWriteFile,
+        Self::FilesystemExists,
+        Self::FilesystemDeleteFile,
+        Self::FilesystemReadDir,
+        Self::StringTrim,
+        Self::StringUppercase,
+        Self::StringLowercase,
+        Self::StringIsDigits,
+        Self::NumberParse,
+        Self::ResultOk,
+        Self::ResultError,
+        Self::ResultIsOk,
+        Self::ResultIsError,
+        Self::ResultWithDefault,
+        Self::TaskAll,
+        Self::TaskRace,
+        Self::TaskSpawn,
+        Self::TaskDefer,
+        Self::TaskForce,
+    ];
+
     /// Returns the human-readable function name.
     #[must_use]
     pub const fn name(self) -> &'static str {
@@ -527,8 +731,16 @@ impl NativeFunction {
             Self::ArrayFilter => "Array.filter",
             Self::ArrayLength => "Array.length",
             Self::HttpServe => "Http.serve",
-            Self::JsonParse => "Json.parse",
-            Self::JsonStringify => "Json.stringify",
+            Self::JsonToObject => "Json.jsonToObject",
+            Self::JsonToString => "Json.jsonToString",
+            Self::JsonToPrettyString => "Json.jsonToPrettyString",
+            Self::LoggerCreate => "Logger.create",
+            Self::LoggerLog => "Logger.log",
+            Self::LoggerDebug => "Logger.debug",
+            Self::LoggerInfo => "Logger.info",
+            Self::LoggerWarn => "Logger.warn",
+            Self::LoggerError => "Logger.error",
+            Self::LoggerPrettyJson => "Logger.prettyJson",
             Self::FilesystemReadFile => "FileSystem.readFile",
             Self::FilesystemWriteFile => "FileSystem.writeFile",
             Self::FilesystemExists => "FileSystem.exists",
@@ -560,7 +772,14 @@ impl NativeFunction {
             Self::ArrayMap | Self::ArrayFilter => 2,
             Self::ArrayLength => 1,
             Self::HttpServe => 2,
-            Self::JsonParse | Self::JsonStringify => 1,
+            Self::JsonToObject | Self::JsonToString | Self::JsonToPrettyString => 1,
+            Self::LoggerCreate => 1,
+            Self::LoggerLog
+            | Self::LoggerDebug
+            | Self::LoggerInfo
+            | Self::LoggerWarn
+            | Self::LoggerError
+            | Self::LoggerPrettyJson => 2,
             Self::FilesystemReadFile
             | Self::FilesystemExists
             | Self::FilesystemDeleteFile
@@ -597,6 +816,13 @@ impl NativeFunction {
         matches!(
             self,
             Self::HttpServe
+                | Self::LoggerCreate
+                | Self::LoggerLog
+                | Self::LoggerDebug
+                | Self::LoggerInfo
+                | Self::LoggerWarn
+                | Self::LoggerError
+                | Self::LoggerPrettyJson
                 | Self::FilesystemReadFile
                 | Self::FilesystemWriteFile
                 | Self::FilesystemExists
@@ -604,17 +830,99 @@ impl NativeFunction {
                 | Self::FilesystemReadDir
         )
     }
+
+    /// Returns the owning standard-library module for this native function.
+    #[must_use]
+    pub const fn module_name(self) -> &'static str {
+        match self {
+            Self::ObjectSpread => "std:object",
+            Self::ArrayMap | Self::ArrayFilter | Self::ArrayLength => "std:array",
+            Self::HttpServe => "std:http",
+            Self::JsonToObject | Self::JsonToString | Self::JsonToPrettyString => "std:json",
+            Self::LoggerCreate
+            | Self::LoggerLog
+            | Self::LoggerDebug
+            | Self::LoggerInfo
+            | Self::LoggerWarn
+            | Self::LoggerError
+            | Self::LoggerPrettyJson => "std:logger",
+            Self::FilesystemReadFile
+            | Self::FilesystemWriteFile
+            | Self::FilesystemExists
+            | Self::FilesystemDeleteFile
+            | Self::FilesystemReadDir => "std:filesystem",
+            Self::StringTrim
+            | Self::StringUppercase
+            | Self::StringLowercase
+            | Self::StringIsDigits => "std:string",
+            Self::NumberParse => "std:number",
+            Self::ResultOk
+            | Self::ResultError
+            | Self::ResultIsOk
+            | Self::ResultIsError
+            | Self::ResultWithDefault => "std:result",
+            Self::TaskAll
+            | Self::TaskRace
+            | Self::TaskSpawn
+            | Self::TaskDefer
+            | Self::TaskForce => "std:task",
+        }
+    }
+
+    /// Returns the exported symbol name within the owning stdlib module.
+    #[must_use]
+    pub const fn export_name(self) -> &'static str {
+        match self {
+            Self::ObjectSpread => "spread",
+            Self::ArrayMap => "map",
+            Self::ArrayFilter => "filter",
+            Self::ArrayLength => "length",
+            Self::HttpServe => "serve",
+            Self::JsonToObject => "jsonToObject",
+            Self::JsonToString => "jsonToString",
+            Self::JsonToPrettyString => "jsonToPrettyString",
+            Self::LoggerCreate => "create",
+            Self::LoggerLog => "log",
+            Self::LoggerDebug => "debug",
+            Self::LoggerInfo => "info",
+            Self::LoggerWarn => "warn",
+            Self::LoggerError => "error",
+            Self::LoggerPrettyJson => "prettyJson",
+            Self::FilesystemReadFile => "readFile",
+            Self::FilesystemWriteFile => "writeFile",
+            Self::FilesystemExists => "exists",
+            Self::FilesystemDeleteFile => "deleteFile",
+            Self::FilesystemReadDir => "readDir",
+            Self::StringTrim => "trim",
+            Self::StringUppercase => "uppercase",
+            Self::StringLowercase => "lowercase",
+            Self::StringIsDigits => "isDigits",
+            Self::NumberParse => "parse",
+            Self::ResultOk => "ok",
+            Self::ResultError => "error",
+            Self::ResultIsOk => "isOk",
+            Self::ResultIsError => "isError",
+            Self::ResultWithDefault => "withDefault",
+            Self::TaskAll => "all",
+            Self::TaskRace => "race",
+            Self::TaskSpawn => "spawn",
+            Self::TaskDefer => "defer",
+            Self::TaskForce => "force",
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        DeferredBody, DeferredOutcome, DeferredValue, Environment, FunctionValue, NativeFunction,
-        NativeFunctionValue, RuntimeError, SchedulerExecutor, SingleThreadedScheduler, Value,
+        DeferredBody, DeferredOutcome, DeferredValue, Environment, FunctionValue,
+        NativeAbiOwnership, NativeAbiStorage, NativeAbiValueKind, NativeAbiValueSpec,
+        NativeFunction, NativeFunctionValue, RuntimeError, SchedulerExecutor,
+        SingleThreadedScheduler, Value,
     };
     use fscript_ir::{Expr, Parameter, Pattern};
     use fscript_source::Span;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
 
     #[test]
     fn display_formats_nested_values() {
@@ -627,6 +935,121 @@ mod tests {
         ]));
 
         assert_eq!(value.to_string(), "{ name: 'Ada', scores: [1, 2] }");
+    }
+
+    #[test]
+    fn native_abi_specs_choose_runtime_owned_handles_at_stable_boundaries() {
+        assert_eq!(
+            NativeAbiValueSpec::for_kind(NativeAbiValueKind::Number),
+            NativeAbiValueSpec {
+                kind: NativeAbiValueKind::Number,
+                stable_storage: NativeAbiStorage::OpaqueHandle,
+                optimized_storage: NativeAbiStorage::UnboxedF64,
+                ownership: NativeAbiOwnership::RuntimeOwned,
+            }
+        );
+        assert_eq!(
+            NativeAbiValueSpec::for_kind(NativeAbiValueKind::Boolean),
+            NativeAbiValueSpec {
+                kind: NativeAbiValueKind::Boolean,
+                stable_storage: NativeAbiStorage::OpaqueHandle,
+                optimized_storage: NativeAbiStorage::UnboxedBool,
+                ownership: NativeAbiOwnership::RuntimeOwned,
+            }
+        );
+        assert_eq!(
+            NativeAbiValueSpec::for_kind(NativeAbiValueKind::Null),
+            NativeAbiValueSpec {
+                kind: NativeAbiValueKind::Null,
+                stable_storage: NativeAbiStorage::OpaqueHandle,
+                optimized_storage: NativeAbiStorage::ImmediateTag,
+                ownership: NativeAbiOwnership::RuntimeOwned,
+            }
+        );
+        assert_eq!(
+            NativeAbiValueSpec::for_kind(NativeAbiValueKind::Closure),
+            NativeAbiValueSpec {
+                kind: NativeAbiValueKind::Closure,
+                stable_storage: NativeAbiStorage::OpaqueHandle,
+                optimized_storage: NativeAbiStorage::OpaqueHandle,
+                ownership: NativeAbiOwnership::RuntimeOwned,
+            }
+        );
+        assert_eq!(
+            NativeAbiValueSpec::for_kind(NativeAbiValueKind::TaskHandle),
+            NativeAbiValueSpec {
+                kind: NativeAbiValueKind::TaskHandle,
+                stable_storage: NativeAbiStorage::OpaqueHandle,
+                optimized_storage: NativeAbiStorage::OpaqueHandle,
+                ownership: NativeAbiOwnership::RuntimeOwned,
+            }
+        );
+    }
+
+    #[test]
+    fn runtime_values_report_their_native_abi_contract() {
+        let closure = Value::Function(FunctionValue {
+            parameters: vec![],
+            body: Box::new(Expr::Null {
+                span: Span::new(0, 0),
+            }),
+            environment: Environment::new(),
+            applied_args: Vec::new(),
+            is_generator: false,
+        });
+        let generator = Value::Function(FunctionValue {
+            parameters: vec![],
+            body: Box::new(Expr::Null {
+                span: Span::new(0, 0),
+            }),
+            environment: Environment::new(),
+            applied_args: Vec::new(),
+            is_generator: true,
+        });
+
+        assert_eq!(
+            Value::Number(1.0).native_abi_kind(),
+            NativeAbiValueKind::Number
+        );
+        assert_eq!(
+            Value::Boolean(true).native_abi_spec().optimized_storage,
+            NativeAbiStorage::UnboxedBool
+        );
+        assert_eq!(Value::Null.native_abi_kind(), NativeAbiValueKind::Null);
+        assert_eq!(
+            Value::Undefined.native_abi_kind(),
+            NativeAbiValueKind::Undefined
+        );
+        assert_eq!(closure.native_abi_kind(), NativeAbiValueKind::Closure);
+        assert_eq!(generator.native_abi_kind(), NativeAbiValueKind::Generator);
+        assert_eq!(
+            Value::Deferred(DeferredValue::new(DeferredBody::Call(Box::new(
+                Value::Null
+            ))))
+            .native_abi_kind(),
+            NativeAbiValueKind::DeferredHandle
+        );
+        assert_eq!(
+            Value::NativeFunction(NativeFunctionValue::new(NativeFunction::ArrayLength))
+                .native_abi_kind(),
+            NativeAbiValueKind::NativeFunction
+        );
+    }
+
+    #[test]
+    fn native_abi_number_handles_round_trip_into_runtime_values() {
+        let handle = super::fscript_value_from_number(42.5);
+
+        assert!(!handle.is_null());
+        // SAFETY: the handle came from `fscript_value_from_number` in this test.
+        let value = unsafe { &*handle };
+        assert_eq!(value, &Value::Number(42.5));
+
+        unsafe {
+            super::fscript_value_drop(handle);
+            super::fscript_value_drop(std::ptr::null_mut());
+            super::fscript_value_print(std::ptr::null());
+        }
     }
 
     #[test]
@@ -893,13 +1316,39 @@ mod tests {
             (NativeFunction::ArrayFilter, "Array.filter", 2, true, false),
             (NativeFunction::ArrayLength, "Array.length", 1, true, false),
             (NativeFunction::HttpServe, "Http.serve", 2, true, true),
-            (NativeFunction::JsonParse, "Json.parse", 1, true, false),
             (
-                NativeFunction::JsonStringify,
-                "Json.stringify",
+                NativeFunction::JsonToObject,
+                "Json.jsonToObject",
                 1,
                 true,
                 false,
+            ),
+            (
+                NativeFunction::JsonToString,
+                "Json.jsonToString",
+                1,
+                true,
+                false,
+            ),
+            (
+                NativeFunction::JsonToPrettyString,
+                "Json.jsonToPrettyString",
+                1,
+                true,
+                false,
+            ),
+            (NativeFunction::LoggerCreate, "Logger.create", 1, true, true),
+            (NativeFunction::LoggerLog, "Logger.log", 2, true, true),
+            (NativeFunction::LoggerDebug, "Logger.debug", 2, true, true),
+            (NativeFunction::LoggerInfo, "Logger.info", 2, true, true),
+            (NativeFunction::LoggerWarn, "Logger.warn", 2, true, true),
+            (NativeFunction::LoggerError, "Logger.error", 2, true, true),
+            (
+                NativeFunction::LoggerPrettyJson,
+                "Logger.prettyJson",
+                2,
+                true,
+                true,
             ),
             (
                 NativeFunction::FilesystemReadFile,
@@ -989,6 +1438,21 @@ mod tests {
             assert_eq!(function.forces_arguments(), forces_arguments);
             assert_eq!(function.is_effectful(), is_effectful);
         }
+    }
+
+    #[test]
+    fn native_function_list_has_unique_module_export_pairs() {
+        let pairs = NativeFunction::ALL
+            .into_iter()
+            .map(|function| (function.module_name(), function.export_name()))
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(pairs.len(), NativeFunction::ALL.len());
+        assert!(pairs.contains(&("std:array", "map")));
+        assert!(pairs.contains(&("std:task", "force")));
+        assert!(pairs.contains(&("std:http", "serve")));
+        assert!(pairs.contains(&("std:json", "jsonToPrettyString")));
+        assert!(pairs.contains(&("std:logger", "prettyJson")));
     }
 
     struct TestExecutor;

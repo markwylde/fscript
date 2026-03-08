@@ -18,7 +18,182 @@ use std::{
 
 use camino::{Utf8Path, Utf8PathBuf};
 use fscript_ir::{CompiledProgram, Module};
+use fscript_runtime::NativeFunction;
 use thiserror::Error;
+
+/// Current backend owner for a stdlib export in `fscript compile`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StdlibBackendOwner {
+    EmbeddedRunner,
+    NativeRuntimeCall,
+    NativeLowered,
+}
+
+/// Backend status for one stdlib export.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StdlibBackendStatus {
+    pub module: &'static str,
+    pub export: &'static str,
+    pub owner: StdlibBackendOwner,
+}
+
+const fn stdlib_backend_status(
+    function: NativeFunction,
+    owner: StdlibBackendOwner,
+) -> StdlibBackendStatus {
+    StdlibBackendStatus {
+        module: function.module_name(),
+        export: function.export_name(),
+        owner,
+    }
+}
+
+/// Current stdlib backend parity table for `fscript compile`.
+pub const STDLIB_BACKEND_PARITY: [StdlibBackendStatus; NativeFunction::ALL.len()] = [
+    stdlib_backend_status(
+        NativeFunction::ObjectSpread,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(NativeFunction::ArrayMap, StdlibBackendOwner::EmbeddedRunner),
+    stdlib_backend_status(
+        NativeFunction::ArrayFilter,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::ArrayLength,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::HttpServe,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::JsonToObject,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::JsonToString,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::JsonToPrettyString,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::LoggerCreate,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::LoggerLog,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::LoggerDebug,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::LoggerInfo,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::LoggerWarn,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::LoggerError,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::LoggerPrettyJson,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::FilesystemReadFile,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::FilesystemWriteFile,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::FilesystemExists,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::FilesystemDeleteFile,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::FilesystemReadDir,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::StringTrim,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::StringUppercase,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::StringLowercase,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::StringIsDigits,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::NumberParse,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(NativeFunction::ResultOk, StdlibBackendOwner::EmbeddedRunner),
+    stdlib_backend_status(
+        NativeFunction::ResultError,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::ResultIsOk,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::ResultIsError,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::ResultWithDefault,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(NativeFunction::TaskAll, StdlibBackendOwner::EmbeddedRunner),
+    stdlib_backend_status(NativeFunction::TaskRace, StdlibBackendOwner::EmbeddedRunner),
+    stdlib_backend_status(
+        NativeFunction::TaskSpawn,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::TaskDefer,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+    stdlib_backend_status(
+        NativeFunction::TaskForce,
+        StdlibBackendOwner::EmbeddedRunner,
+    ),
+];
+
+/// Returns the current backend owner for a stdlib export in `fscript compile`.
+#[must_use]
+pub fn stdlib_backend_owner(module: &str, export: &str) -> Option<StdlibBackendOwner> {
+    let mut index = 0;
+    while index < STDLIB_BACKEND_PARITY.len() {
+        let status = STDLIB_BACKEND_PARITY[index];
+        if status.module == module && status.export == export {
+            return Some(status.owner);
+        }
+        index += 1;
+    }
+
+    None
+}
 
 /// Compiles a single IR module into a native executable.
 pub fn compile_module(module: &Module, output: &Utf8Path) -> Result<(), CompileError> {
@@ -235,15 +410,16 @@ fn create_temp_directory() -> Result<Utf8PathBuf, CompileError> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeMap, process::Command};
+    use std::{collections::BTreeMap, collections::BTreeSet, process::Command};
 
     use camino::Utf8PathBuf;
     use fscript_ir::{BindingDecl, Expr, ModuleItem, Pattern};
+    use fscript_runtime::NativeFunction;
     use fscript_source::Span;
 
     use super::{
-        CompileError, compile_module, compile_program, create_temp_directory, runner_binary_name,
-        workspace_root,
+        CompileError, STDLIB_BACKEND_PARITY, StdlibBackendOwner, compile_module, compile_program,
+        create_temp_directory, runner_binary_name, stdlib_backend_owner, workspace_root,
     };
 
     fn span() -> Span {
@@ -360,6 +536,30 @@ mod tests {
         assert_eq!(String::from_utf8_lossy(&output.stdout), "{ wrapped: 1 }\n");
 
         let _ = std::fs::remove_file(output_path);
+    }
+
+    #[test]
+    fn stdlib_backend_parity_covers_every_runtime_native_export() {
+        let expected = NativeFunction::ALL
+            .into_iter()
+            .map(|function| (function.module_name(), function.export_name()))
+            .collect::<BTreeSet<_>>();
+        let actual = STDLIB_BACKEND_PARITY
+            .iter()
+            .map(|status| (status.module, status.export))
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn stdlib_backend_parity_reports_embedded_runner_ownership_today() {
+        for status in STDLIB_BACKEND_PARITY {
+            assert_eq!(
+                stdlib_backend_owner(status.module, status.export),
+                Some(StdlibBackendOwner::EmbeddedRunner)
+            );
+        }
     }
 
     fn temp_binary_path(label: &str) -> Utf8PathBuf {

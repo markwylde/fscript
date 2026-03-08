@@ -53,6 +53,7 @@ import String from 'std:string'
 import Number from 'std:number'
 import Result from 'std:result'
 import Json from 'std:json'
+import Logger from 'std:logger'
 import FileSystem from 'std:filesystem'
 import Task from 'std:task'
 ```
@@ -113,6 +114,7 @@ The minimum built-in module set for Draft 0.1 is:
 - `std:number`
 - `std:result`
 - `std:json`
+- `std:logger`
 - `std:filesystem`
 - `std:task`
 
@@ -277,23 +279,115 @@ Purpose:
 
 - JSON parsing and serialization
 - explicit boundary between untyped external data and typed program values
+- practical configuration-file parsing through comment-tolerant JSON input
 
 Representative API:
 
 ```fs
-Json.parse = (text: String): Unknown
-Json.stringify = (value: Unknown): String
+Json.jsonToObject = (text: String): Unknown
+Json.jsonToString = (value: Unknown): String
+Json.jsonToPrettyString = (value: Unknown): String
 Json.decode = <T>(decoder: Decoder<T>, value: Unknown): Result<T, DecodeError>
 Json.parseAs = <T>(decoder: Decoder<T>, text: String): Result<T, DecodeError>
 ```
 
 Notes:
 
-- `Json.parse` should not pretend arbitrary JSON is already typed program data
+- `Json.jsonToObject` should not pretend arbitrary JSON is already typed program data
 - decoding should be explicit
 - `Decoder<T>` may be a standard-library abstraction introduced in Draft 0.1 or Draft 0.2
+- `Json.jsonToString` should produce compact single-line JSON output
+- `Json.jsonToPrettyString` should produce stable multi-line JSON with two-space indentation
+- `Json.parse` and `Json.stringify` may remain available as compatibility aliases during the Draft 0.1 transition, but `jsonToObject` and `jsonToString` are the preferred names
 
-## 12. `std:filesystem`
+### 11.1 Comment-Tolerant Parsing
+
+`Json.jsonToObject` and `Json.parseAs` should accept a relaxed JSON input mode intended for human-edited files.
+
+The parser must ignore the following forms when they appear outside JSON string literals:
+
+- line comments starting with `//`
+- line comments starting with `#`
+- block comments delimited by `/*` and `*/`
+- lines whose trimmed contents are exactly `---`
+
+The relaxed parser should otherwise follow normal JSON structure rules.
+
+Important constraints:
+
+- comment markers inside string literals are ordinary string content and must not be stripped
+- `---` is ignored only when it appears on its own trimmed line
+- trailing non-comment, non-whitespace content after the JSON value is still an error
+
+Example:
+
+```fs
+import Json from 'std:json'
+
+config = Json.jsonToObject(
+  '
+  ---
+  {
+    // app name
+    "name": "demo",
+    # http port
+    "port": 8080,
+    /* enabled in local development */
+    "debug": true
+  }
+  '
+)
+```
+
+## 12. `std:logger`
+
+Purpose:
+
+- runtime-backed terminal logging
+- explicit effectful output for debugging and operator-facing messages
+- ergonomic pretty-printing of JSON values
+
+Representative API:
+
+```fs
+Logger.create = (options: {
+  name: String | Null,
+  level: 'debug' | 'info' | 'warn' | 'error',
+  destination: 'stdout' | 'stderr',
+}): Logger
+Logger.log = (logger: Logger, message: String): Undefined
+Logger.debug = (logger: Logger, message: String): Undefined
+Logger.info = (logger: Logger, message: String): Undefined
+Logger.warn = (logger: Logger, message: String): Undefined
+Logger.error = (logger: Logger, message: String): Undefined
+Logger.prettyJson = (logger: Logger, value: Unknown): Undefined
+```
+
+Notes:
+
+- `Logger` is an opaque runtime-backed handle, not a user-constructible record
+- all logger operations are effectful
+- logger output goes directly to the terminal selected by `destination`
+- `Logger.prettyJson` should behave like `Logger.log(logger, Json.jsonToPrettyString(value))`
+- the runtime should prefix lines with logger metadata when `name` is present
+
+Example:
+
+```fs
+import Json from 'std:json'
+import Logger from 'std:logger'
+
+logger = Logger.create({
+  name: 'seed',
+  level: 'info',
+  destination: 'stdout',
+})
+
+config = Json.jsonToObject('{ "port": 8080 }')
+printed = Logger.prettyJson(logger, config)
+```
+
+## 13. `std:filesystem`
 
 Purpose:
 
@@ -325,7 +419,7 @@ import FileSystem from 'std:filesystem'
 loadText = (path: String): String => FileSystem.readFile(path)
 ```
 
-## 13. `std:task`
+## 14. `std:task`
 
 Purpose:
 

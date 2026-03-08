@@ -52,8 +52,7 @@ pub(crate) fn compile_program(
 
     let temp_dir = super::create_temp_directory()?;
     let object_path = temp_dir.join("program.o");
-    let runtime_source_path = temp_dir.join("runtime_support.c");
-    let runtime_object_path = temp_dir.join("runtime_support.o");
+    let runtime_library_path = build_runtime_abi_library(&temp_dir)?;
 
     let emitted = emit_object(module, &object_path)?;
     fs::write(&object_path, emitted).map_err(|source| CompileError::ObjectEmission {
@@ -61,36 +60,9 @@ pub(crate) fn compile_program(
         details: source.to_string(),
     })?;
 
-    fs::write(&runtime_source_path, runtime_support_source()).map_err(|source| {
-        CompileError::ObjectEmission {
-            path: runtime_source_path.clone(),
-            details: source.to_string(),
-        }
-    })?;
-
-    let runtime_compile = Command::new("cc")
-        .arg("-c")
-        .arg(&runtime_source_path)
-        .arg("-o")
-        .arg(&runtime_object_path)
-        .output()
-        .map_err(|source| CompileError::LinkInvocation {
-            output: runtime_object_path.clone(),
-            source,
-        })?;
-
-    if !runtime_compile.status.success() {
-        return Err(CompileError::LinkFailed {
-            output: runtime_object_path,
-            stderr: String::from_utf8_lossy(&runtime_compile.stderr)
-                .trim()
-                .to_owned(),
-        });
-    }
-
     let linker = Command::new("cc")
         .arg(&object_path)
-        .arg(&runtime_object_path)
+        .arg(&runtime_library_path)
         .arg("-o")
         .arg(output)
         .output()
@@ -139,7 +111,10 @@ fn emit_object(
         })?;
     let mut module_ctx = ObjectModule::new(object_builder);
 
-    let print_number = declare_print_number(&mut module_ctx)?;
+    let pointer_type = module_ctx.target_config().pointer_type();
+    let box_number = declare_value_from_number(&mut module_ctx)?;
+    let print_value = declare_value_print(&mut module_ctx, pointer_type)?;
+    let drop_value = declare_value_drop(&mut module_ctx, pointer_type)?;
 
     let main_id = declare_main(&mut module_ctx)?;
     let mut context = module_ctx.make_context();
@@ -182,8 +157,13 @@ fn emit_object(
             details: "native Cranelift subset requires at least one top-level binding".to_owned(),
         })?;
 
-        let print_ref = module_ctx.declare_func_in_func(print_number, builder.func);
-        let _ = builder.ins().call(print_ref, &[last_value]);
+        let box_ref = module_ctx.declare_func_in_func(box_number, builder.func);
+        let boxed_value = builder.ins().call(box_ref, &[last_value]);
+        let value_handle = builder.inst_results(boxed_value)[0];
+        let print_ref = module_ctx.declare_func_in_func(print_value, builder.func);
+        let _ = builder.ins().call(print_ref, &[value_handle]);
+        let drop_ref = module_ctx.declare_func_in_func(drop_value, builder.func);
+        let _ = builder.ins().call(drop_ref, &[value_handle]);
         let zero = builder.ins().iconst(types::I32, 0);
         builder.ins().return_(&[zero]);
         builder.finalize();
@@ -207,21 +187,96 @@ fn emit_object(
         })
 }
 
-fn declare_print_number(
+fn declare_value_from_number(
     module: &mut ObjectModule,
 ) -> Result<cranelift_module::FuncId, CompileError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(types::F64));
+    signature
+        .returns
+        .push(AbiParam::new(module.target_config().pointer_type()));
 
     module
-        .declare_function("fscript_print_number", Linkage::Import, &signature)
+        .declare_function("fscript_value_from_number", Linkage::Import, &signature)
         .map_err(|error| CompileError::NativeModule {
             details: error.to_string(),
         })
 }
 
-fn runtime_support_source() -> &'static str {
-    "#include <stdio.h>\n\nvoid fscript_print_number(double value) {\n    printf(\"%g\\n\", value);\n}\n"
+fn declare_value_print(
+    module: &mut ObjectModule,
+    pointer_type: ir::Type,
+) -> Result<cranelift_module::FuncId, CompileError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+
+    module
+        .declare_function("fscript_value_print", Linkage::Import, &signature)
+        .map_err(|error| CompileError::NativeModule {
+            details: error.to_string(),
+        })
+}
+
+fn declare_value_drop(
+    module: &mut ObjectModule,
+    pointer_type: ir::Type,
+) -> Result<cranelift_module::FuncId, CompileError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+
+    module
+        .declare_function("fscript_value_drop", Linkage::Import, &signature)
+        .map_err(|error| CompileError::NativeModule {
+            details: error.to_string(),
+        })
+}
+
+fn build_runtime_abi_library(temp_dir: &Utf8Path) -> Result<camino::Utf8PathBuf, CompileError> {
+    let cargo_target_dir = temp_dir.join("cargo-target");
+    let manifest_path = Utf8Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Utf8Path::parent)
+        .expect("crate manifest should live under the workspace root")
+        .join("Cargo.toml");
+    let cargo_output = Command::new("cargo")
+        .arg("build")
+        .arg("--release")
+        .arg("--package")
+        .arg("fscript-runtime")
+        .arg("--manifest-path")
+        .arg(&manifest_path)
+        .env("CARGO_TARGET_DIR", cargo_target_dir.as_str())
+        .output()
+        .map_err(|source| CompileError::CargoInvocation { source })?;
+
+    if !cargo_output.status.success() {
+        return Err(CompileError::CargoFailed {
+            output: cargo_target_dir.clone(),
+            stderr: String::from_utf8_lossy(&cargo_output.stderr)
+                .trim()
+                .to_owned(),
+        });
+    }
+
+    let library_name = if cfg!(windows) {
+        "fscript_runtime.lib"
+    } else {
+        "libfscript_runtime.a"
+    };
+    let library_path = cargo_target_dir.join("release").join(library_name);
+
+    if !library_path.exists() {
+        return Err(CompileError::CopyCompiledBinary {
+            from: library_path.clone(),
+            to: temp_dir.to_owned(),
+            source: std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "runtime ABI library was not produced by cargo build",
+            ),
+        });
+    }
+
+    Ok(library_path)
 }
 
 fn declare_main(module: &mut ObjectModule) -> Result<cranelift_module::FuncId, CompileError> {

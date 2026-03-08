@@ -14,4 +14,5 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 fscript-ir = { path = "../fscript-ir" }
+fscript-runtime = { path = "../fscript-runtime" }
 fscript-source = { path = "../fscript-source" }
