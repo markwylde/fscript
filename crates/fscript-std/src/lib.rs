@@ -11,7 +11,8 @@ use std::{
 };
 
 use fscript_runtime::{
-    DeferredBody, DeferredValue, NativeFunction, NativeFunctionValue, RuntimeError, Value,
+    DeferredBody, DeferredOutcome, DeferredValue, NativeFunction, NativeFunctionValue,
+    RuntimeError, SchedulerExecutor, SingleThreadedScheduler, Value,
 };
 
 /// Loads a runtime-backed `std:` module into a record of exported values.
@@ -146,6 +147,197 @@ where
         NativeFunction::TaskDefer => task_defer(args).map_err(E::from),
         NativeFunction::TaskForce => task_force(args, &mut force),
     }
+}
+
+fn native_abi_take_value(handle: *mut Value) -> Value {
+    if handle.is_null() {
+        Value::Undefined
+    } else {
+        // SAFETY: native ABI wrappers only pass handles allocated by runtime helpers.
+        unsafe { *Box::from_raw(handle) }
+    }
+}
+
+fn native_abi_box_value(value: Value) -> *mut Value {
+    Box::into_raw(Box::new(value))
+}
+
+struct NativeAbiExecutor;
+
+impl SchedulerExecutor<RuntimeError> for NativeAbiExecutor {
+    fn evaluate_expr_task(
+        &mut self,
+        _expr: &fscript_ir::Expr,
+        _environment: &fscript_runtime::Environment,
+    ) -> Result<DeferredOutcome, RuntimeError> {
+        Err(RuntimeError::new(
+            "native ABI helper does not support deferred expression tasks",
+        ))
+    }
+
+    fn execute_native_task(
+        &mut self,
+        function: NativeFunction,
+        args: Vec<Value>,
+    ) -> Result<Value, RuntimeError> {
+        execute_native_function(
+            function,
+            args,
+            |_callee, _args| {
+                Err(RuntimeError::new(
+                    "native ABI helper does not support callback-based native tasks",
+                ))
+            },
+            |value| self.force_task_input(value),
+        )
+    }
+
+    fn force_task_input(&mut self, value: Value) -> Result<Value, RuntimeError> {
+        match value {
+            Value::Deferred(deferred) => {
+                let mut scheduler = SingleThreadedScheduler::new();
+                match scheduler.force_deferred(deferred, self)? {
+                    DeferredOutcome::Value(value) | DeferredOutcome::Throw(value) => Ok(value),
+                }
+            }
+            other => Ok(other),
+        }
+    }
+}
+
+/// Executes `FileSystem.writeFile` through the native ABI.
+///
+/// # Safety
+///
+/// `path` and `contents` must be null or owned handles returned by the runtime ABI helpers.
+#[must_use]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_std_filesystem_write_file(
+    path: *mut Value,
+    contents: *mut Value,
+) -> *mut Value {
+    let value = execute_native_function(
+        NativeFunction::FilesystemWriteFile,
+        vec![native_abi_take_value(path), native_abi_take_value(contents)],
+        |_callee, _args| Err(RuntimeError::new("unexpected callback while writing a file")),
+        Ok,
+    )
+    .unwrap_or_else(|error| Value::String(error.message().to_owned()));
+    native_abi_box_value(value)
+}
+
+/// Executes `FileSystem.exists` through the native ABI.
+///
+/// # Safety
+///
+/// `path` must be null or an owned handle returned by the runtime ABI helpers.
+#[must_use]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_std_filesystem_exists(path: *mut Value) -> *mut Value {
+    let value = execute_native_function(
+        NativeFunction::FilesystemExists,
+        vec![native_abi_take_value(path)],
+        |_callee, _args| Err(RuntimeError::new("unexpected callback while checking a file")),
+        Ok,
+    )
+    .unwrap_or_else(|error| Value::String(error.message().to_owned()));
+    native_abi_box_value(value)
+}
+
+/// Executes `FileSystem.readFile` eagerly through the native ABI.
+///
+/// # Safety
+///
+/// `path` must be null or an owned handle returned by the runtime ABI helpers.
+#[must_use]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_std_filesystem_read_file(path: *mut Value) -> *mut Value {
+    let value = execute_native_function(
+        NativeFunction::FilesystemReadFile,
+        vec![native_abi_take_value(path)],
+        |_callee, _args| Err(RuntimeError::new("unexpected callback while reading a file")),
+        Ok,
+    )
+    .unwrap_or_else(|error| Value::String(error.message().to_owned()));
+    native_abi_box_value(value)
+}
+
+/// Creates a deferred `FileSystem.readFile` handle through the native ABI.
+///
+/// # Safety
+///
+/// `path` must be null or an owned handle returned by the runtime ABI helpers.
+#[must_use]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_std_filesystem_read_file_defer(path: *mut Value) -> *mut Value {
+    let deferred = DeferredValue::new(DeferredBody::NativeCall {
+        function: NativeFunction::FilesystemReadFile,
+        args: vec![native_abi_take_value(path)],
+    });
+    native_abi_box_value(Value::Deferred(deferred))
+}
+
+/// Executes `FileSystem.deleteFile` through the native ABI.
+///
+/// # Safety
+///
+/// `path` must be null or an owned handle returned by the runtime ABI helpers.
+#[must_use]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_std_filesystem_delete_file(path: *mut Value) -> *mut Value {
+    let value = execute_native_function(
+        NativeFunction::FilesystemDeleteFile,
+        vec![native_abi_take_value(path)],
+        |_callee, _args| Err(RuntimeError::new("unexpected callback while deleting a file")),
+        Ok,
+    )
+    .unwrap_or_else(|error| Value::String(error.message().to_owned()));
+    native_abi_box_value(value)
+}
+
+/// Executes `Json.jsonToPrettyString` through the native ABI.
+///
+/// # Safety
+///
+/// `value` must be null or an owned handle returned by the runtime ABI helpers.
+#[must_use]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_std_json_to_pretty_string(value: *mut Value) -> *mut Value {
+    let value = execute_native_function(
+        NativeFunction::JsonToPrettyString,
+        vec![native_abi_take_value(value)],
+        |_callee, _args| Err(RuntimeError::new("unexpected callback while formatting JSON")),
+        Ok,
+    )
+    .unwrap_or_else(|error| Value::String(error.message().to_owned()));
+    native_abi_box_value(value)
+}
+
+/// Forces deferred values and applies the current `+` behavior needed by the native ABI slice.
+///
+/// # Safety
+///
+/// `left` and `right` must be null or owned handles returned by the runtime ABI helpers.
+#[must_use]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_std_add(left: *mut Value, right: *mut Value) -> *mut Value {
+    let mut executor = NativeAbiExecutor;
+    let left = executor
+        .force_task_input(native_abi_take_value(left))
+        .unwrap_or_else(|error| Value::String(error.message().to_owned()));
+    let right = executor
+        .force_task_input(native_abi_take_value(right))
+        .unwrap_or_else(|error| Value::String(error.message().to_owned()));
+
+    let value = match (left, right) {
+        (Value::String(mut left), Value::String(right)) => {
+            left.push_str(&right);
+            Value::String(left)
+        }
+        (Value::Number(left), Value::Number(right)) => Value::Number(left + right),
+        (left, right) => Value::String(format!("{left}{right}")),
+    };
+    native_abi_box_value(value)
 }
 
 fn native_module(exports: &[(&str, NativeFunction)]) -> Value {

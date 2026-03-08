@@ -228,6 +228,115 @@ pub extern "C" fn fscript_value_from_number(value: f64) -> NativeAbiValueHandle 
     Box::into_raw(Box::new(Value::Number(value)))
 }
 
+/// Boxes a boolean runtime value for the native ABI boundary.
+#[must_use]
+#[unsafe(no_mangle)]
+pub extern "C" fn fscript_value_from_bool(value: u8) -> NativeAbiValueHandle {
+    Box::into_raw(Box::new(Value::Boolean(value != 0)))
+}
+
+/// Boxes a UTF-8 string runtime value for the native ABI boundary.
+///
+/// # Safety
+///
+/// `ptr` must be null only when `len` is zero. Otherwise, it must point to `len` bytes of valid
+/// UTF-8 that remain readable for the duration of this call.
+#[must_use]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_value_from_string(
+    ptr: *const u8,
+    len: usize,
+) -> NativeAbiValueHandle {
+    let value = if len == 0 {
+        String::new()
+    } else {
+        let bytes = unsafe { std::slice::from_raw_parts(ptr, len) };
+        String::from_utf8_lossy(bytes).into_owned()
+    };
+
+    Box::into_raw(Box::new(Value::String(value)))
+}
+
+/// Clones a runtime value handle for reuse across native ABI calls.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live [`Value`] allocated by the runtime ABI helpers.
+#[must_use]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_value_clone(handle: *const Value) -> NativeAbiValueHandle {
+    if handle.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let value = unsafe { &*handle };
+    Box::into_raw(Box::new(value.clone()))
+}
+
+/// Creates an empty record runtime value for the native ABI boundary.
+#[must_use]
+#[unsafe(no_mangle)]
+pub extern "C" fn fscript_value_record_new() -> NativeAbiValueHandle {
+    Box::into_raw(Box::new(Value::Record(BTreeMap::new())))
+}
+
+/// Inserts a field into a record runtime value and returns the same record handle.
+///
+/// # Safety
+///
+/// `record` must be null or an owned record handle returned by the runtime ABI helpers. `key_ptr`
+/// follows the same requirements as [`fscript_value_from_string`]. `value` must be null or an
+/// owned handle returned by the runtime ABI helpers. Ownership of `value` transfers into the
+/// record on success.
+#[must_use]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_value_record_insert(
+    record: NativeAbiValueHandle,
+    key_ptr: *const u8,
+    key_len: usize,
+    value: NativeAbiValueHandle,
+) -> NativeAbiValueHandle {
+    if record.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let key = if key_len == 0 {
+        String::new()
+    } else {
+        let bytes = unsafe { std::slice::from_raw_parts(key_ptr, key_len) };
+        String::from_utf8_lossy(bytes).into_owned()
+    };
+    let record_ref = unsafe { &mut *record };
+    if let Value::Record(fields) = record_ref {
+        let inserted = if value.is_null() {
+            Value::Undefined
+        } else {
+            *unsafe { Box::from_raw(value) }
+        };
+        fields.insert(key, inserted);
+    }
+
+    record
+}
+
+/// Reads a Boolean runtime value for native control-flow branches.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live [`Value`] allocated by the runtime ABI helpers.
+#[must_use]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fscript_value_as_bool(handle: *const Value) -> u8 {
+    if handle.is_null() {
+        return 0;
+    }
+
+    match unsafe { &*handle } {
+        Value::Boolean(true) => 1,
+        _ => 0,
+    }
+}
+
 /// Prints a runtime value referenced by a native ABI handle.
 ///
 /// # Safety
