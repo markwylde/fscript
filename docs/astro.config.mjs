@@ -62,7 +62,7 @@ export default defineConfig({
 				},
 				{
 					label: 'Playground',
-					link: '/fscript/sandbox/',
+					link: '/sandbox/',
 				},
 			],
 			expressiveCode: {

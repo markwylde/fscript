@@ -2,14 +2,16 @@
 import type { Props } from '@astrojs/starlight/props';
 import Default from '@astrojs/starlight/components/SiteTitle.astro';
 
+const baseUrl = import.meta.env.BASE_URL;
+
 ---
 
 <div class="site-title-wrapper">
   <Default {...Astro.props} />
   
   <nav class="top-nav">
-    <a href="/introduction/overview/" class="nav-link">Docs</a>
-    <a href="/sandbox/" class="nav-link">Sandbox</a>
+    <a href={`${baseUrl}introduction/overview/`} class="nav-link">Docs</a>
+    <a href={`${baseUrl}sandbox/`} class="nav-link">Sandbox</a>
   </nav>
 </div>
 
