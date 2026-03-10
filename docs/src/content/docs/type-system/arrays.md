@@ -5,15 +5,25 @@ description: Homogeneous immutable collections and how unions appear when array 
 
 Arrays are ordered immutable collections.
 
-```fs
+## Example
+
+```fscript
 numbers = [1, 2, 3] // Number[]
-values = [1, 'two'] // (Number | String)[]
 ```
 
 ## Rules
 
-- array element types are inferred from elements
-- mixed arrays require a union element type
-- index assignment is invalid
-- array transforms return new arrays
+- element types are inferred from the contents
+- mixed arrays produce union element types
+- arrays are immutable
+- array-transforming operations return new arrays
 
+Example:
+
+```fscript
+values = [1, 'two'] // (Number | String)[]
+```
+
+## Comparison to JavaScript
+
+JavaScript arrays are flexible and mutable. FScript arrays are more predictable and friendlier to static reasoning.

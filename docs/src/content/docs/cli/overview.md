@@ -5,41 +5,71 @@ description: The current FScript command-line surface and how the main commands 
 
 # CLI Overview
 
-The current FScript CLI is a small tool with three main commands:
+The current CLI exposes four top-level commands:
 
-- `check`
-- `run`
-- `compile`
+- `fscript check`
+- `fscript run`
+- `fscript compile`
+- `fscript version`
 
-The help output describes it as:
+The command help currently looks like this:
 
 ```text
-FScript compiler and tooling
+Usage: fscript [COMMAND]
+
+Commands:
+  check    Typecheck and validate a source file
+  run      Run an FScript entrypoint
+  compile  Compile an FScript entrypoint to a native executable
+  version  Show version and build information
 ```
 
-## Command Summary
+## How the commands fit together
 
-### `fscript check <file.fs>`
+`check`
+: validate a program without executing it
 
-Typecheck and validate a source file.
+`run`
+: execute through the broadest current runtime path
 
-### `fscript run <file.fs>`
+`compile`
+: build an executable and exercise the current native pipeline
 
-Run an FScript entrypoint.
+`version`
+: inspect build and version metadata
 
-### `fscript compile <input.fs> <output>`
+## A practical loop
 
-Compile an FScript entrypoint to a native executable.
+For most projects today, this is the smoothest order:
 
-## Practical Advice
+1. `fscript check src/main.fs`
+2. `fscript run src/main.fs`
+3. `fscript compile src/main.fs ./main`
 
-- start with `check` when you want fast validation
-- use `run` for the broadest current execution path
-- use `compile` when your program is within the currently supported compile subset
+That sequence matches the current maturity of the implementation: validation is strong, runtime execution is broader, and compile parity is still expanding.
 
-## Related Pages
+## Important current limitation
 
-- [Check](./check.md)
-- [Run](./run.md)
-- [Compile](./compile.md)
-- [Compile vs run](../implementation-status/compile-vs-run.md)
+The docs distinguish carefully between the language design and the current implementation. In particular:
+
+- `run` is the most capable execution path today
+- `compile` already emits real executables
+- the fully native backend still covers a smaller slice than the long-term language design
+
+Read [Compile vs Run](../implementation-status/compile-vs-run.md) if you want the exact framing.
+
+## Comparison to TypeScript tooling
+
+This CLI is intentionally smaller than a typical TypeScript toolchain:
+
+- no separate bundler is required by the language
+- no Node.js runtime is assumed by the language model
+- the compiler is not primarily a JavaScript transpiler
+
+Think of FScript more like a small native language toolchain than a JS ecosystem wrapper.
+
+## Command reference
+
+- [fscript check](./check.md)
+- [fscript run](./run.md)
+- [fscript compile](./compile.md)

@@ -5,31 +5,50 @@ description: Immutable bindings, block scope, and how FScript models updates by 
 
 Bindings use plain `=` and are immutable.
 
-```fs
+## Basic bindings
+
+```fscript
 answer = 42
 name = 'Ada'
 ```
 
-## Rules
+Rules:
 
-- bindings are immutable
 - bindings are block-scoped
 - rebinding the same name in the same scope is a compile error
-- nested shadowing is allowed
-- `let`, `const`, and `var` are not supported
+- shadowing in a nested inner scope is allowed
+- `let`, `const`, and `var` are not part of the language
 
-Records and arrays are also immutable:
+## Immutability is not just for names
 
-```fs
-user.name = 'Grace' // invalid
-items[0] = 10 // invalid
+Records and arrays are also immutable in Draft 0.1.
+
+These are invalid:
+
+```fscript
+user.name = 'Grace'
+items[0] = 10
 ```
 
 Instead, create new values:
 
-```fs
+```fscript
 import Object from 'std:object'
 
-next = Object.spread(base, { active: true })
+nextUser = Object.spread(user, { name: 'Grace' })
 ```
 
+## Why this matters
+
+Immutability makes code easier to reason about and supports stronger compiler guarantees. It also fits naturally with FScript's pipe-oriented and expression-oriented style.
+
+## Comparison to JavaScript or TypeScript
+
+If you are used to mutable local variables, the main habit change is to model steps as new values:
+
+```fscript
+trimmed = String.trim(text)
+normalized = String.lowercase(trimmed)
+```
+
+That style is often clearer anyway because intermediate states are named explicitly.

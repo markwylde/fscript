@@ -5,25 +5,19 @@ description: Runtime boundaries, host capabilities, and where validation still m
 
 # Errors and Boundaries
 
-Well-typed FScript code aims to avoid internal runtime type errors, but host boundaries still matter.
+Well-typed FScript code aims to avoid internal type mismatches at runtime, but host boundaries still matter.
 
-## Typical Boundary Points
+## Common boundary points
 
 - file input
 - JSON parsing
-- terminal logging
-- decoding external data
-- future native interop boundaries
+- future native interop
+- runtime-backed host capabilities
 
-## Practical Guidance
+## Why validation still matters
 
-- prefer `Result<T, E>` for expected failures
-- treat JSON, filesystem, and terminal logging work as runtime boundaries
-- do not assume external data is already typed program data
+The typechecker can protect internal code only after external values have been parsed or validated into trusted shapes. That is why docs throughout the site keep recommending explicit parsing and `Result`-based validation at boundaries.
 
-## Related Pages
+## Runtime responsibility
 
-- [Errors](../language-guide/errors.md)
-- [std:json](../standard-library/json.md)
-- [std:logger](../standard-library/logger.md)
-- [std:filesystem](../standard-library/filesystem.md)
+The runtime is responsible for propagating errors across those boundaries clearly without collapsing the distinction between expected failures and exceptional failures.

@@ -5,24 +5,42 @@ description: Why every multi-parameter function is curried and how partial appli
 
 Every multi-parameter function is curried automatically.
 
-```fs
+## Equivalent forms
+
+These mean the same thing:
+
+```fscript
 add = (a: Number, b: Number): Number => a + b
 ```
 
-This is semantically equivalent to:
-
-```fs
+```fscript
 add = (a: Number) => (b: Number): Number => a + b
 ```
 
-## Partial application
+## Partial application is always available
 
-```fs
+```fscript
 add10 = add(10)
-value = add10(5)
+result = add10(5)
 ```
 
-## Important rule
+This is why the standard library is designed around data-last helpers. It makes small reusable pipeline stages easy to build.
 
-Calling a function with fewer arguments returns another function. Calling with too many arguments is a type error in Draft 0.1.
+## Example with arrays
 
+```fscript
+import Array from 'std:array'
+
+onlyActive = Array.filter((user) => user.active)
+namesOnly = Array.map((user) => user.name)
+```
+
+Each value above is a reusable function produced through partial application.
+
+## Comparison to JavaScript or TypeScript
+
+Currying exists in JS and TS libraries, but it is not the default language model. In FScript it is built into how functions work, so API design and everyday usage both lean on it heavily.
+
+## Rule to remember
+
+Calling a function with too many arguments is a type error in Draft 0.1.

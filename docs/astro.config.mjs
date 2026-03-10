@@ -66,8 +66,12 @@ export default defineConfig({
 				},
 			],
 			expressiveCode: {
-				shikiConfig: {
+				shiki: {
 					langs: [fsGrammar],
+					langAlias: {
+						spec: 'fscript',
+						'fscript-spec': 'fscript',
+					},
 				},
 			},
 		}),

@@ -5,24 +5,19 @@ description: How FScript loads modules, initializes them once, and handles cycle
 
 # Module Loading
 
-Each `.fs` file is a module, and top-level module code executes once when the module is loaded.
+Each `.fs` file is a module, and top-level code runs once when the module is loaded.
 
-## Key Rules
+## Key rules
 
-- module resolution is defined by the compiler and runtime
-- `std:` modules are provided by the language runtime
-- user modules can import relative `.fs` files
-- Draft 0.1 treats circular imports as a compile error
+- modules initialize once
+- user-module imports are resolved through the FScript toolchain
+- circular imports are a compile error in Draft 0.1
+- standard-library modules come from runtime-backed `std:` implementations
 
-## Current Implementation Notes
+## Current implementation note
 
-The implementation plan already calls out runtime support for:
+The current runtime already supports canonical path resolution, cycle rejection, and once-per-module initialization for user imports.
 
-- canonical path resolution
-- cycle rejection
-- once-per-module initialization
+## Why this matters
 
-## Related Pages
-
-- [Modules](../language-guide/modules.md)
-- [CLI run](../cli/run.md)
+Predictable module loading makes both the typechecker and the runtime easier to reason about than looser JavaScript environments with multiple interop models.

@@ -5,7 +5,7 @@ description: The canonical built-in type names used throughout FScript docs and 
 
 # Built-In Types
 
-Canonical built-in type names:
+The canonical built-in type names used throughout the docs and specs are:
 
 - `Number`
 - `String`
@@ -15,9 +15,11 @@ Canonical built-in type names:
 - `Never`
 - `Unknown`
 
-These names are used consistently throughout the language guide, type system pages, and reference docs.
+## Why the canonical names matter
 
-## Related Pages
+Using the same names consistently across code examples, docs, and compiler diagnostics helps the language feel smaller and easier to learn.
 
-- [Primitive types](../type-system/primitive-types.md)
+## Related pages
+
+- [Primitive Types](../type-system/primitive-types.md)
 - [Unknown, Never, Null, and Undefined](../type-system/unknown-never-null-undefined.md)

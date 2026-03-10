@@ -7,24 +7,37 @@ Control flow in FScript is expression-oriented.
 
 ## `if`
 
-```fs
-label = if (active) {
-  'active'
-} else {
-  'inactive'
-}
+```fscript
+label = if (active) { 'enabled' } else { 'disabled' }
 ```
+
+Both branches produce values, and the whole `if` expression produces a value too.
 
 ## `match`
 
-```fs
-message = match (status) {
-  'ok' => 'good'
-  'error' => 'bad'
+```fscript
+message = match (result) {
+  { tag: 'ok', value } => 'value: ' + value
+  { tag: 'error', error } => 'error: ' + error.message
 }
 ```
 
-## `try` and `catch`
+`match` is the preferred tool for tagged unions and shape-based branching.
 
-`try` and `catch` are also part of the expression model. They produce values rather than acting like statement-only control flow.
+## `try/catch`
 
+```fscript
+safeRead = (path: String) => {
+  try {
+    FileSystem.readFile(path)
+  } catch (error) {
+    'fallback'
+  }
+}
+```
+
+Like other forms, `try/catch` is value-producing.
+
+## Comparison to JavaScript
+
+JavaScript has these constructs too, but FScript leans much harder on them as expressions rather than statements. That makes them fit naturally inside pipelines, bindings, and helper functions.

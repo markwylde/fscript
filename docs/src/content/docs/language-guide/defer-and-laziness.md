@@ -1,22 +1,47 @@
 ---
 title: Defer and Laziness
-description: Use defer when you want laziness explicitly rather than the normal eager effect-start behavior.
+description: Why FScript is eager by default, what defer changes, and when delayed effect start is the right tool.
 ---
 
-Effects start eagerly by default. `defer` is how you choose laziness explicitly.
+FScript is eager by default for effectful work. `defer` is the explicit way to delay that start.
 
-```fs
-a = defer getA()
-b = defer getB()
+```fscript
+lazyConfig = defer FileSystem.readFile('./config.json')
 ```
 
-## Runtime model
+That means:
 
-- creating a deferred value does not start the effect
-- forcing or invoking it starts the effect exactly once
-- repeated forcing should reuse the same eventual result in Draft 0.1
+- `FileSystem.readFile(path)` starts when execution reaches it
+- `defer FileSystem.readFile(path)` captures the work without starting it yet
 
-## Why this is explicit
+This page is the short guide. For the full explanation, examples, and design rationale, see [Detailed Defer and Laziness](./effects/defer-and-laziness.md).
 
-FScript wants eagerness to be the default effect model and laziness to be a deliberate choice.
+## Why `defer` exists
 
+FScript separates two ideas:
+
+- starting effectful work
+- consuming the result of effectful work
+
+By default, effectful calls start eagerly. `defer` exists for the cases where that is not what you want.
+
+Use `defer` when:
+
+- work is optional
+- work is expensive
+- work should begin only if a later branch needs it
+- you want laziness to be clearly visible in the source
+
+## Runtime behavior
+
+Draft 0.1 prefers memoized single-start semantics:
+
+- creating a deferred value captures the expression and its environment
+- forcing it starts the work
+- repeated force observes the same eventual result
+
+## Related Pages
+
+- [Effects](/fscript/language-guide/effects/)
+- [Detailed Defer and Laziness](/fscript/language-guide/effects/defer-and-laziness/)
+- [Execution Model](/fscript/language-guide/runtime/execution-model/)

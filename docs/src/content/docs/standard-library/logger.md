@@ -5,58 +5,30 @@ description: Runtime-backed terminal logging for text messages and pretty JSON o
 
 # `std:logger`
 
-`std:logger` provides explicit terminal logging through the runtime.
+`std:logger` provides runtime-backed logging.
 
-```fs
+```fscript
 import Logger from 'std:logger'
 ```
 
-## Representative API
+## Typical usage
 
-```fs
-Logger.create = (options: {
-  name: String | Null,
-  level: 'debug' | 'info' | 'warn' | 'error',
-  destination: 'stdout' | 'stderr',
-}): Logger
-Logger.log = (logger: Logger, message: String): Undefined
-Logger.debug = (logger: Logger, message: String): Undefined
-Logger.info = (logger: Logger, message: String): Undefined
-Logger.warn = (logger: Logger, message: String): Undefined
-Logger.error = (logger: Logger, message: String): Undefined
-Logger.prettyJson = (logger: Logger, value: Unknown): Undefined
+```fscript
+Logger.info('starting')
+Logger.info({ tag: 'config_loaded', path: './config.json' })
+Logger.error('failed to load config')
 ```
 
-## Semantics
+## Why logging is a module
 
-- logger operations are effectful
-- output goes to the terminal selected by `destination`
-- `Logger.prettyJson` should behave like logging `Json.jsonToPrettyString(value)`
-- treat the value returned by `Logger.create` as the logger you pass to later logger calls
+FScript does not rely on a global `console` object. Logging is an explicit runtime capability, just like filesystem or task helpers.
 
-## Example
+## Good use
 
-```fs
-import Json from 'std:json'
-import Logger from 'std:logger'
+- emit human-readable progress messages
+- log tagged records when structured output is useful
+- keep logging at effect boundaries rather than burying it inside pure helpers
 
-logger = Logger.create({
-  name: 'config',
-  level: 'info',
-  destination: 'stdout',
-})
+## Current implementation note
 
-config = Json.jsonToObject('{ "port": 8080, "debug": true }')
-printed = Logger.prettyJson(logger, config)
-```
-
-## Pretty JSON in the Terminal
-
-Use `Logger.prettyJson` when you want the most direct path from a value to readable terminal output.
-
-Use `Json.jsonToPrettyString` when you want the formatted JSON as a string first, for example before writing it to a file or combining it with other text.
-
-## Related Pages
-
-- [std:json](./json.md)
-- [Runtime boundaries](../runtime/errors-and-boundaries.md)
+The current runtime already ships logger support and the getting-started docs use it in the first program examples.

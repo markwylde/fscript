@@ -5,16 +5,30 @@ description: What FScript infers automatically and where explicit annotations ar
 
 FScript infers local binding types and many local return types when the result is clear.
 
-```fs
+## Examples
+
+```fscript
 answer = 42
 name = 'Ada'
-add = (a: Number, b: Number) => a + b
+active = true
 ```
 
-## Draft 0.1 guidance
+The compiler can infer `Number`, `String`, and `Boolean` here.
 
-- local immutable bindings may omit annotations
+## Where Draft 0.1 expects annotations
+
 - function parameters should usually be annotated
-- local return types may be inferred
-- exported functions should have explicit return types
+- exported functions should usually have explicit return types
+- recursive functions may need explicit annotations when inference would be unstable
 
+## Why the split exists
+
+This gives you a useful middle ground:
+
+- local code stays lightweight
+- module boundaries stay readable
+- early compiler implementation stays simpler and more predictable
+
+## Comparison to TypeScript
+
+TypeScript can infer a lot, but it also allows more escape hatches. FScript is intentionally stricter because the type system is meant to support stronger compile-time guarantees.

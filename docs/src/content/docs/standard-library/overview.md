@@ -5,23 +5,29 @@ description: Explicit std modules, curried data-last APIs, and runtime-backed ho
 
 # Standard Library Overview
 
-FScript uses explicit `std:` imports instead of prototype methods or a single global utility namespace.
+FScript's standard library is explicit by design. Helpers live in imported `std:` modules rather than on prototype chains or global namespaces.
 
-```fs
+## Core principles
+
+- standard-library modules use the reserved `std:` scheme
+- default imports are the normal pattern for `std:` modules
+- functions are curried by default
+- transformation helpers are usually data-last
+- collection helpers never mutate caller-visible data
+
+## Example
+
+```fscript
 import Array from 'std:array'
-import Object from 'std:object'
-import String from 'std:string'
+
+names = users
+  |> Array.filter((user) => user.active)
+  |> Array.map((user) => user.name)
 ```
 
-## Design Rules
+That style works because `Array.filter` and `Array.map` are designed for pipes and partial application.
 
-- modules use the reserved `std:` import scheme
-- default imports are the primary standard pattern
-- functions are curried by default
-- transformation APIs are data-last where appropriate
-- collection helpers return new values instead of mutating input
-
-## Required Draft 0.1 Modules
+## Core Draft 0.1 modules
 
 - `std:array`
 - `std:object`
@@ -33,17 +39,10 @@ import String from 'std:string'
 - `std:filesystem`
 - `std:task`
 
-## A Note About Current Implementation
+## Comparison to JavaScript
 
-The specs describe the intended module surfaces. The current runtime-backed implementation exposes a useful subset already, and some modules are narrower than the representative APIs shown in the specs.
+Instead of `items.map(...)` or `text.trim()`, FScript uses imported helpers such as `Array.map(...)` and `String.trim(...)`. That keeps behavior explicit and avoids depending on prototype methods.
 
-Use the per-module pages for the conceptual model, then check [Implementation Status](../implementation-status/supported-features.md) when you need current-shipping details.
+## Current implementation note
 
-## Related Pages
-
-- [Array](./array.md)
-- [Result](./result.md)
-- [JSON](./json.md)
-- [Logger](./logger.md)
-- [Filesystem](./filesystem.md)
-- [Pipes](../language-guide/pipes.md)
+The current runtime already ships substantial runtime-backed `std:` support, including filesystem, JSON, logging, and task helpers. As with the rest of Draft 0.1, the documented surface is intentionally small and focused.

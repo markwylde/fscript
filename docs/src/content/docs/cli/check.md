@@ -5,32 +5,57 @@ description: Validate and typecheck an FScript source file.
 
 # `fscript check`
 
-`check` validates a source file without running it.
+`fscript check` validates a source file and its module graph without executing the program.
 
 ## Usage
 
-```sh
-fscript check path/to/file.fs
-```
-
-## What It Does
-
-The CLI describes this command as:
-
 ```text
-Typecheck and validate a source file
+Usage: fscript check <PATH>
 ```
 
-In the current implementation, this includes the frontend validation path for the supported language surface.
+Example:
 
-## Example
-
-```sh
-fscript check examples/hello_world.fs
+```bash
+cargo run -p fscript-cli -- check src/main.fs
 ```
 
-## Related Pages
+## What it validates
 
-- [CLI overview](./overview.md)
-- [Run](./run.md)
-- [Implementation status](../implementation-status/supported-features.md)
+The current implementation checks:
+
+- lexing
+- parsing
+- name resolution
+- typechecking
+- effect analysis
+- user-module import graph rules
+
+That makes it the best first command to run while editing.
+
+## When to use it
+
+Use `check` when:
+
+- you want compiler feedback without triggering effects
+- you are iterating on types or module structure
+- you want CI-friendly validation
+
+## What it does not do
+
+`check` does not:
+
+- execute `main`
+- run filesystem or other host effects
+- prove that every runtime-backed boundary value is semantically correct after parsing external data
+
+For example, JSON parsing and data validation are still boundary concerns that your program must model explicitly.
+
+## Comparison to TypeScript
+
+If you know `tsc --noEmit`, this is the closest equivalent in everyday workflow. The main difference is that FScript also includes effect analysis and module-graph validation as part of that single command.
+
+## Related pages
+
+- [fscript run](./run.md)
+- [fscript compile](./compile.md)
+- [Supported Features](../implementation-status/supported-features.md)

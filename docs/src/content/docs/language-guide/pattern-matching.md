@@ -5,24 +5,35 @@ description: Match on literals, records, arrays, and tagged unions with exhausti
 
 `match` is the preferred branching tool for tagged unions and other value-shape decisions.
 
-## Tagged union example
+## Simple example
 
-```fs
-type User =
-  | { tag: 'guest' }
-  | { tag: 'member', id: String, name: String }
-
-describe = (user: User): String => {
-  match (user) {
-    { tag: 'guest' } => 'guest'
-    { tag: 'member', name } => 'member: ' + name
-  }
+```fscript
+describe = (value: Number | String): String => match (value) {
+  0 => 'zero'
+  'ok' => 'status ok'
+  _ => 'something else'
 }
 ```
 
-## Benefits
+## Tagged union example
 
-- branch-local type narrowing
-- readable destructuring
-- exhaustiveness over tagged unions
+```fscript
+type User =
+  | { tag: 'guest' }
+  | { tag: 'member', name: String }
 
+greet = (user: User): String => match (user) {
+  { tag: 'guest' } => 'hello guest'
+  { tag: 'member', name } => 'hello ' + name
+}
+```
+
+## Why `match` matters
+
+- it makes value shape explicit
+- it narrows types inside each arm
+- it encourages exhaustive handling of tagged unions
+
+## Comparison to TypeScript
+
+TypeScript often uses `switch` plus ad hoc narrowing checks. FScript gives pattern matching a more central role, which tends to make union-heavy code shorter and clearer.

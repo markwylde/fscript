@@ -5,19 +5,35 @@ description: Expression-oriented blocks, implicit final values, and why FScript 
 
 FScript is expression-oriented. Blocks are not just statement containers; they evaluate to values.
 
-```fs
-compute = (): Number => {
+## Simple example
+
+```fscript
+result = {
   a = 1
   b = 2
   a + b
 }
 ```
 
-## Rules
+`result` becomes `3` because the final expression in the block is `a + b`.
 
-- the final expression in a block becomes the block value
-- there is no `return` keyword in Draft 0.1
-- local bindings inside blocks are still immutable
+## Function bodies work the same way
 
-This style keeps control flow and value flow tightly connected.
+```fscript
+double = (value: Number): Number => {
+  next = value * 2
+  next
+}
+```
 
+There is no `return` keyword in Draft 0.1.
+
+## Why this style is useful
+
+- small helpers stay compact
+- intermediate values can still be named
+- control flow like `if`, `match`, and `try/catch` fits naturally because they also produce values
+
+## Comparison to JavaScript
+
+JavaScript mixes expressions and statements heavily. FScript keeps more forms expression-oriented so composition stays uniform.

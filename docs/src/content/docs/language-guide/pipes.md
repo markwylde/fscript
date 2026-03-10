@@ -5,13 +5,26 @@ description: Compose transformations left to right with the pipe operator and da
 
 The pipe operator keeps transformation code readable by letting values flow left to right.
 
-```fs
+## Example
+
+```fscript
 import Array from 'std:array'
 
-result = [1, 2, 3]
-  |> Array.map((i) => i + 1)
-  |> Array.filter((i) => i > 2)
+names = users
+  |> Array.filter((user) => user.active)
+  |> Array.map((user) => user.name)
 ```
 
-Pipes work especially well because many FScript helpers are curried and data-last.
+## Why FScript leans on pipes
 
+Pipes pair naturally with:
+
+- curried functions
+- data-last standard-library helpers
+- expression-oriented blocks
+
+That makes multi-step transformations read like a sequence of small decisions rather than nested function calls.
+
+## Comparison to JavaScript
+
+JavaScript often relies on method chains for this style. FScript gets a similar readability benefit while keeping helper functions explicit and separate from value objects.

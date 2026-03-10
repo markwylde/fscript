@@ -5,32 +5,46 @@ description: Immutable plain data structures, structural typing, and common patt
 
 Records and arrays are the main data structures in FScript.
 
-```fs
-user = { id: '1', name: 'Ada' }
-values = [1, 2, 3]
-```
-
 ## Records
 
-- plain immutable data
+```fscript
+user = {
+  id: '1',
+  name: 'Ada',
+  active: true,
+}
+```
+
+Records are:
+
+- plain data
+- immutable
 - structurally typed
-- field order does not matter in types
 
 ## Arrays
 
-- homogeneous by default
+```fscript
+numbers = [1, 2, 3]
+```
+
+Arrays are:
+
+- ordered
+- homogeneous by default at the type level
 - immutable
-- transformed through `std:array`
 
-## Updates
+## Updating values
 
-Build updated values instead of mutating in place:
+Because records and arrays are immutable, updates create new values rather than changing old ones.
 
-```fs
+```fscript
 import Array from 'std:array'
 import Object from 'std:object'
 
-more = Array.append(4, values)
-nextUser = Object.spread(user, { active: true })
+nextUser = Object.spread(user, { active: false })
+nextNumbers = Array.append(4, numbers)
 ```
 
+## Comparison to JavaScript
+
+FScript uses record and array literals that look familiar, but it does not support mutating methods or property writes. Think "plain data plus helpers," not "objects with behavior."

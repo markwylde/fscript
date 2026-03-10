@@ -5,26 +5,39 @@ description: Why the current run path is broader than the current compile path.
 
 # Compile vs Run
 
-The most important current implementation caveat is simple: `run` supports more than `compile`.
+One of the most important current implementation details is that `fscript run` and `fscript compile` do not yet have identical internals.
 
-## Why
+## `run`
 
-The implementation plan intentionally builds `fscript run` on top of the shared IR interpreter first, then grows native code generation after that path is stable.
+`run` is built on the shared frontend, shared IR, runtime, and interpreter path. It is the broadest current execution route and the main behavioral reference point while the compiler matures.
 
-That means:
+## `compile`
 
-- `run` is the main execution path for the broader supported subset
-- `compile` is real and useful, but narrower
-- docs should never imply parity that does not exist yet
+`compile` already produces executables, but the pipeline is mixed:
 
-## Recommended Workflow
+- a real Cranelift-backed native slice exists
+- broader coverage is still supported by packaging the program into an embedded-runner bridge
 
-1. use `check` for validation
-2. use `run` to confirm behavior
-3. use `compile` when your program is in the currently supported backend subset
+## Why this matters
 
-## Related Pages
+A program that works with `run` may not yet exercise the fully native backend, even if `compile` can still build an executable for it through the bridge.
 
-- [CLI run](../cli/run.md)
-- [CLI compile](../cli/compile.md)
-- [Supported features](./supported-features.md)
+That is not a contradiction. It is simply a staging strategy:
+
+- keep one shared execution truth for behavior
+- expand real native lowering gradually
+- avoid inventing multiple incompatible semantics
+
+## Recommended habit
+
+When testing an important program:
+
+1. `fscript check`
+2. `fscript run`
+3. `fscript compile`
+
+This gives you the clearest signal about both language correctness and current compiler maturity.
+
+## Long-term goal
+
+The roadmap is for the compile pipeline to grow until the broader bridge becomes unnecessary and the real native path owns the full supported language subset.

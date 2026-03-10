@@ -5,31 +5,32 @@ description: Runtime task helpers and explicit control over deferred work.
 
 # `std:task`
 
-`std:task` exposes runtime task concepts in a more explicit library surface.
+`std:task` exposes runtime helpers for task and deferred-work coordination.
 
-```fs
+```fscript
 import Task from 'std:task'
 ```
 
-## Representative API
+## Current runtime-backed helpers
 
-```fs
-Task.all = <T>(tasks: Task<T>[]): T[]
-Task.race = <T>(tasks: Task<T>[]): T
-Task.spawn = <T>(task: Task<T>): Task<T>
-Task.force = <T>(deferred: Deferred<T>): T
-Task.defer = <T>(fn: (): T): Deferred<T>
-```
+The implementation plan already calls out helpers such as:
 
-## Guidance
+- `Task.all`
+- `Task.race`
+- `Task.spawn`
+- `Task.defer`
+- `Task.force`
 
-The language already has native `defer`, so this module should stay small and focused. It is most useful where explicit control is clearer than relying only on implicit scheduling.
+## Why this module exists
 
-## Current Implementation Note
+FScript handles many effect details in the runtime automatically, but some workflows still benefit from explicit task-oriented helpers. This module is the place for those controls rather than exposing a JavaScript-style `Promise` API in user code.
 
-The current runtime-backed implementation already exposes `all`, `defer`, and `force`.
+## Important context
 
-## Related Pages
+Task behavior is tied closely to the current runtime and scheduler implementation, so this page should be read together with the runtime docs.
 
-- [Defer and laziness](../language-guide/defer-and-laziness.md)
-- [Runtime tasks](../runtime/tasks.md)
+## Related pages
+
+- [Execution Model](../runtime/execution-model.md)
+- [Scheduler](../runtime/scheduler.md)
+- [Tasks](../runtime/tasks.md)

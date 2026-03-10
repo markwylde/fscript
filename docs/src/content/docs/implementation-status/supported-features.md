@@ -5,32 +5,48 @@ description: A high-level summary of what the current repository already impleme
 
 # Supported Features
 
-Based on the implementation plan and current repository surface, the project already includes a substantial executable slice.
+The repository already implements a meaningful slice of the language and runtime. This page is a high-level summary, not an exhaustive matrix.
 
-## Broadly Present Today
+## Frontend and validation
 
-- CLI wiring for `check`, `run`, and `compile`
-- lexing and parsing for a broad language surface
-- name resolution, HIR lowering, typechecking, and effect analysis for the current supported subset
-- shared IR and interpreter support for the main `run` path
-- user-module imports with path resolution and cycle rejection
-- runtime-backed `std:json`, `std:logger`, and `std:filesystem`
-- comment-tolerant JSON parsing plus compact and pretty JSON output
-- core examples running through `fscript run`
+Currently supported in the frontend:
 
-## Areas Still Evolving
+- imports and exports
+- type declarations
+- bindings and destructuring
+- functions and currying
+- records, arrays, calls, pipes, and control flow
+- generator syntax
+- name resolution
+- strict typechecking for the current executable subset
+- effect analysis
 
-- scheduler-backed effect execution
-- full parity between `run` and `compile`
-- broader standard-library completeness relative to representative spec APIs
-- some parts of the runtime model that are described more fully in the specs than in the current executable implementation
+## `run` path
 
-## A Small Extra Note
+The current `run` path supports a broad slice of executable behavior, including:
 
-The repository also contains early support for `std:http`, used by the HTTP hello server example, but it is beyond the minimum Draft 0.1 core stdlib set.
+- user-defined functions
+- records and arrays
+- `if`, `match`, destructuring, and generators
+- `try/catch` and `throw`
+- memoized `defer`
+- user-module imports
+- runtime-backed `std:json`, `std:filesystem`, minimal `std:http`, and `std:task`
 
-## Related Pages
+## `compile` path
 
-- [Compile vs run](./compile-vs-run.md)
-- [CLI overview](../cli/overview.md)
-- [Runtime scheduler](../runtime/scheduler.md)
+The current compile story includes:
+
+- standalone executable output
+- a real bounded Cranelift/object/link path
+- a broader embedded-runner bridge for wider behavior coverage
+
+## Important caveats
+
+- not every spec idea has full implementation parity yet
+- long-lived background dependency draining in the scheduler is still an active gap
+- the real native backend still covers less than the full long-term language surface
+
+## Best mental model
+
+Think of the project as "already usable in meaningful slices, still converging on its final architecture," not as "purely aspirational" and not as "already feature-complete."

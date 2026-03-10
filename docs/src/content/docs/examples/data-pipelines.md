@@ -5,25 +5,55 @@ description: Compose immutable transformations with arrays, pipes, and curried f
 
 # Data Pipelines
 
-Pipes and data-last stdlib functions make collection work straightforward.
+FScript is a strong fit for data reshaping work because the language defaults line up with transformation pipelines:
 
-```fs
+- values are immutable
+- array helpers are curried
+- pipes keep the flow left to right
+
+## Example: active user names
+
+```fscript
 import Array from 'std:array'
+import String from 'std:string'
 
-numbers = [1, 2, 3, 4, 5]
+type User = {
+  id: String,
+  name: String,
+  active: Boolean,
+}
 
-result = numbers
-  |> Array.map((value: Number): Number => value + 1)
-  |> Array.filter((value: Number): Boolean => value > 3)
+displayNames = (users: User[]): String[] => users
+  |> Array.filter((user) => user.active)
+  |> Array.map((user) => String.uppercase(user.name))
 ```
 
-This style works well because:
+## Why this style works well
 
-- arrays are immutable
-- transformations return new values
-- standard-library functions are designed for partial application
+Each step does one thing:
 
-## Related Pages
+- `Array.filter` narrows the collection
+- `Array.map` reshapes the values
+- the pipe makes the order read like a recipe
 
-- [Pipes](../language-guide/pipes.md)
-- [std:array](../standard-library/array.md)
+Because the APIs are data-last, partial application is natural:
+
+```fscript
+onlyActive = Array.filter((user: User) => user.active)
+toUpperName = Array.map((user: User) => String.uppercase(user.name))
+
+displayNames = (users: User[]): String[] => users
+  |> onlyActive
+  |> toUpperName
+```
+
+## Comparison to JavaScript
+
+A JavaScript version would likely use `users.filter(...).map(...)`. FScript chooses imported helpers instead so the behavior is explicit and consistent across the language.
+
+## Tips for good pipelines
+
+- keep each pipeline stage small
+- extract named helpers when a lambda gets busy
+- perform validation near the boundary before entering the pure pipeline
+- return new records instead of trying to "patch" old ones in place

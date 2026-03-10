@@ -7,20 +7,22 @@ description: How the runtime manages generator state for lazy sequences.
 
 Generators are runtime-managed lazy sequences.
 
-## Runtime Responsibilities
+## Runtime responsibilities
 
 - store generator state
-- resume execution from the last `yield`
-- produce the next yielded value or completion
-- preserve captured environments
+- preserve captured locals
+- resume from the last `yield`
+- report either the next yielded value or completion
 
-## Draft 0.1 Boundaries
+## Recommended representation
 
-- generators are for pure lazy iteration
-- they do not model async streaming
-- async streams are a separate future abstraction
+The spec's guidance is:
 
-## Related Pages
+- a generator frame
+- an instruction pointer or state index
+- captured locals
+- a completion flag
 
-- [Language generators](../language-guide/generators.md)
-- [Function types](../type-system/functions.md)
+## Important limit
+
+Draft 0.1 generators are for pure lazy iteration, not async streaming.

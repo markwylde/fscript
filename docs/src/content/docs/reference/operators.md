@@ -5,23 +5,30 @@ description: The small set of operators and operator-like forms highlighted in t
 
 # Operators
 
-FScript keeps its operator surface relatively small and leans heavily on function composition.
+FScript keeps its operator surface intentionally small.
 
-## Common Forms
+## Common operators and forms
 
-- `=` for immutable bindings
-- `+` for numeric or string combination where valid
-- `|>` for pipe composition
-- `|` for union types
-- `&` for intersection types
-- `=>` for arrow functions and match arms
+`=`
+: immutable binding
 
-## Guidance
+`|`
+: union types
 
-When a transformation can be expressed clearly as a function call, FScript usually prefers that over a larger set of special operators.
+`&`
+: intersection types
 
-## Related Pages
+`|>`
+: pipe operator
 
-- [Pipes](../language-guide/pipes.md)
-- [Union types](../type-system/unions.md)
-- [Intersection types](../type-system/intersections.md)
+`=>`
+: function arrow
+
+## Practical note
+
+Many things that JavaScript expresses through methods or runtime objects are expressed in FScript through imported helpers instead of additional operators.
+
+## Related pages
+
+- [Syntax Reference](./syntax-reference.md)
+- [Keywords](./keywords.md)

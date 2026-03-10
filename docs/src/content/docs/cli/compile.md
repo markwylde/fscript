@@ -5,33 +5,51 @@ description: Compile an entrypoint to a native executable, with important curren
 
 # `fscript compile`
 
-`compile` emits a native executable for a supported FScript entrypoint.
+`fscript compile` builds an FScript entrypoint into a native executable.
 
 ## Usage
 
-```sh
-fscript compile input.fs output
+```text
+Usage: fscript compile <INPUT> <OUTPUT>
 ```
 
-## Example
+Example:
 
-```sh
-cargo run -p fscript-cli -- compile examples/hello_world.fs ./hello-world
-./hello-world
+```bash
+cargo run -p fscript-cli -- compile src/main.fs ./main
 ```
 
-## Important Caveat
+## What "compile" means today
 
-The implementation plan is clear that `compile` is currently narrower than `run`. The docs treat `compile` as real and useful, but not yet at full parity with the broader execution path.
+The current compile pipeline is intentionally described as mixed:
 
-When you are unsure whether a feature is supported end-to-end:
+- there is a real Cranelift-backed native codegen slice
+- broader compile coverage is still supported through an embedded-runner bridge
+- full parity with `run` is still a roadmap item
 
-- validate with `check`
-- confirm behavior with `run`
-- use `compile` for the subset that the backend currently handles
+That is why the docs talk about compile support carefully. The command is real and useful, but not every successful `run` program is already handled by the fully native backend.
 
-## Related Pages
+## Good use cases right now
 
-- [CLI overview](./overview.md)
-- [Run](./run.md)
-- [Compile vs run](../implementation-status/compile-vs-run.md)
+- producing executables for supported programs
+- testing the native pipeline as it expands
+- validating that your project stays within current compile coverage
+
+## When to sanity-check with `run`
+
+If a program is important and uses richer language features, it is wise to test both:
+
+1. `fscript check`
+2. `fscript run`
+3. `fscript compile`
+
+That gives you both semantic confidence and a compile-coverage signal.
+
+## Comparison to TypeScript builds
+
+Unlike `tsc`, FScript is not mainly compiling to JavaScript output. The intended end state is a native toolchain and runtime. The current mixed pipeline is a temporary implementation stage, not the design goal.
+
+## Related pages
+
+- [Compile vs Run](../implementation-status/compile-vs-run.md)
+- [Roadmap](../implementation-status/roadmap.md)

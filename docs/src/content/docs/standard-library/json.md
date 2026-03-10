@@ -5,80 +5,36 @@ description: JSON parsing, serialization, and explicit host-boundary typing.
 
 # `std:json`
 
-`std:json` handles JSON parsing and serialization while keeping the boundary to typed program data explicit.
+`std:json` handles parsing and serializing JSON at a host boundary.
 
-```fs
+```fscript
 import Json from 'std:json'
 ```
 
-## Representative API
+## Typical role
 
-```fs
-Json.jsonToObject = (text: String): Unknown
-Json.jsonToString = (value: Unknown): String
-Json.jsonToPrettyString = (value: Unknown): String
-Json.decode = <T>(decoder: Decoder<T>, value: Unknown): Result<T, DecodeError>
-Json.parseAs = <T>(decoder: Decoder<T>, text: String): Result<T, DecodeError>
-```
+JSON is one of the clearest places where runtime data and static types meet. The standard workflow is:
 
-## Why `Unknown` Matters
+1. read raw text
+2. parse JSON
+3. validate shape explicitly
+4. return a typed domain value
 
-`Json.jsonToObject` should not pretend arbitrary JSON is already typed FScript data. Decoding is the point where unknown external data becomes validated program data.
+## Example
 
-## Comment-Tolerant Parsing
-
-`Json.jsonToObject` and `Json.parseAs` accept a relaxed JSON mode for human-edited config files.
-
-Outside string literals, the parser should ignore:
-
-- `//` line comments
-- `#` line comments
-- `/* ... */` block comments
-- lines whose trimmed contents are exactly `---`
-
-This keeps ordinary JSON structure rules while making configuration files easier to maintain.
-
-```fs
-import Json from 'std:json'
-
-config = Json.jsonToObject(
-  '
-  ---
-  {
-    // service name
-    "name": "demo",
-    # port for local development
-    "port": 8080,
-    /* enable extra output */
-    "debug": true
-  }
-  '
-)
-```
-
-## Compact and Pretty Output
-
-- `Json.jsonToString` produces compact single-line JSON
-- `Json.jsonToPrettyString` produces stable multi-line JSON with two-space indentation
-
-```fs
-import Json from 'std:json'
-
-value = {
-  name: 'demo',
-  port: 8080,
+```fscript
+readConfig = (path: String) => {
+  text = FileSystem.readFile(path)
+  Json.parse(text)
 }
-
-compact = Json.jsonToString(value)
-pretty = Json.jsonToPrettyString(value)
 ```
 
-## Current Implementation Note
+Then handle the parsed value with `match` or `Result`-based validation instead of assuming it already has the domain shape you want.
 
-The current runtime-backed implementation exposes `jsonToObject`, `jsonToString`, and `jsonToPrettyString`, and the older `parse` and `stringify` names remain available as compatibility aliases. Decoder-based helpers are still part of the broader planned API shape.
+## Why the docs emphasize validation
 
-## Related Pages
+The type system aims to keep well-typed internal code safe, but external data still needs checking. `std:json` is therefore more than a convenience module; it is a reminder that host boundaries stay explicit.
 
-- [Unknown, Never, Null, and Undefined](../type-system/unknown-never-null-undefined.md)
-- [std:logger](./logger.md)
-- [Filesystem](./filesystem.md)
+## Current implementation note
+
+The current runtime already ships `std:json`, and the broader docs/examples assume it as part of the available `run` path.
