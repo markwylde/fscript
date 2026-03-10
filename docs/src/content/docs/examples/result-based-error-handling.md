@@ -5,29 +5,56 @@ description: Prefer typed recoverable errors over exceptions for expected failur
 
 # Result-Based Error Handling
 
-For expected failures, FScript favors `Result<T, E>`.
+When a failure is expected and callers should recover from it, `Result<T, E>` is usually the clearest model.
 
-```fs
-type Result<T, E> =
-  | { tag: 'ok', value: T }
-  | { tag: 'error', error: E }
-```
+## Example: parse a port
 
-That shape works well with:
+```fscript
+import Number from 'std:number'
+import Result from 'std:result'
+import String from 'std:string'
 
-- tagged unions
-- `match`
-- explicit domain modeling
+type ParseError = {
+  tag: 'parse_error',
+  message: String,
+}
 
-```fs
-match (parsed) {
-  { tag: 'ok', value } => value
-  { tag: 'error', error } => error.message
+parsePort = (text: String): Result<Number, ParseError> => {
+  if (String.isDigits(text)) {
+    Result.ok(Number.parse(text))
+  } else {
+    Result.error({
+      tag: 'parse_error',
+      message: 'port must contain digits only',
+    })
+  }
 }
 ```
 
-## Related Pages
+## Example: compose with `andThen`
 
-- [Errors](../language-guide/errors.md)
-- [Pattern matching](../language-guide/pattern-matching.md)
-- [std:result](../standard-library/result.md)
+```fscript
+requireInRange = (value: Number): Result<Number, ParseError> => {
+  if (value > 0 && value < 65536) {
+    Result.ok(value)
+  } else {
+    Result.error({
+      tag: 'parse_error',
+      message: 'port must be between 1 and 65535',
+    })
+  }
+}
+
+parseValidPort = (text: String): Result<Number, ParseError> => {
+  parsePort(text)
+    |> Result.andThen(requireInRange)
+}
+```
+
+## Why prefer this over exceptions
+
+- the success and error shapes are part of the type
+- callers can handle cases with `match`
+- failure stays visible in signatures
+
+Use `throw` for exceptional situations. Use `Result` when failure is part of ordinary control flow.

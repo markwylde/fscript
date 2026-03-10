@@ -5,19 +5,33 @@ description: Use Result for expected failures and throw for exceptional control 
 
 FScript supports two broad error styles.
 
-## `Result`
+## `Result` for expected failures
 
-Use `Result<T, E>` for expected failure:
+Use `Result<T, E>` when callers should recover intentionally.
 
-```fs
-type ParseError = { tag: 'parse_error', message: String }
+```fscript
+type Result<T, E> =
+  | { tag: 'ok', value: T }
+  | { tag: 'error', error: E }
 ```
 
-## `throw`
+This is the preferred model for parsing, validation, and other ordinary failure cases.
 
-Use `throw` when the control flow is exceptional and you want the nearest `catch` to handle it.
+## `throw` for exceptional situations
 
-## Important difference from JavaScript
+```fscript
+fail = (message: String): Never => {
+  throw { tag: 'fatal', message }
+}
+```
 
-Thrown values are plain data, not error class instances.
+`try/catch` can recover from thrown values when needed.
 
+## Good rule of thumb
+
+- use `Result` when failure is part of the domain
+- use `throw` when continuing normally is not the expected path
+
+## Comparison to JavaScript
+
+JavaScript code often uses exceptions for many ordinary failure modes. FScript nudges you toward typed data-first failure handling instead.

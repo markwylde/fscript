@@ -5,36 +5,32 @@ description: Numeric helpers and string-to-number parsing.
 
 # `std:number`
 
-`std:number` provides numeric helpers and parsing-related functions.
+`std:number` provides numeric helpers and basic parsing.
 
-```fs
+```fscript
 import Number from 'std:number'
 ```
 
 ## Representative API
 
-```fs
+```fscript
 Number.parse = (value: String): Number
 Number.toString = (value: Number): String
 Number.floor = (value: Number): Number
 Number.ceil = (value: Number): Number
 Number.round = (value: Number): Number
+Number.min = (right: Number, left: Number): Number
+Number.max = (right: Number, left: Number): Number
 Number.clamp = (min: Number, max: Number, value: Number): Number
 ```
 
 ## Example
 
-```fs
-import Number from 'std:number'
-
-port = Number.parse('8080')
+```fscript
+port = Number.parse('3000')
+safe = Number.clamp(1, 65535, port)
 ```
 
-## Current Implementation Note
+## Note
 
-The current runtime-backed implementation already exposes `Number.parse`.
-
-## Related Pages
-
-- [Primitive types](../type-system/primitive-types.md)
-- [Result module](./result.md)
+The spec leaves room for more `Result`-returning numeric helpers in future additions where failure should be modeled explicitly.

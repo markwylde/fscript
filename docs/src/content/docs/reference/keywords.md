@@ -32,7 +32,6 @@ Reserved built-in type names:
 - `Never`
 - `Unknown`
 
-## Related Pages
+## Practical note
 
-- [Built-in types](./built-in-types.md)
-- [Syntax reference](./syntax-reference.md)
+These names are reserved by the grammar and should not be used as ordinary identifiers.

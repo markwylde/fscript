@@ -5,32 +5,47 @@ description: Execute an FScript entrypoint through the current runtime and inter
 
 # `fscript run`
 
-`run` executes an FScript entrypoint.
+`fscript run` executes an FScript entrypoint through the current shared IR, runtime, and interpreter path.
 
 ## Usage
 
-```sh
-fscript run path/to/file.fs
+```text
+Usage: fscript run <PATH>
 ```
 
-## Examples
+Example:
 
-```sh
-fscript run examples/hello_world.fs
+```bash
+cargo run -p fscript-cli -- run src/main.fs
 ```
 
-```sh
-cargo run -p fscript-cli -- run examples/http_hello_server/main.fs
-```
+## Why this is the default execution command today
 
-## Notes
+The implementation plan treats `run` as the main source of truth for behavior while the native compiler continues to grow. That means `run` is currently the broadest supported execution path.
 
-- this is the broadest current execution path
-- the implementation plan treats `run` as the source of truth while the shared execution path matures
-- the CLI prints the final value when the entry module produces one
+Today that path includes substantial support for:
 
-## Related Pages
+- user-defined functions and currying
+- records and arrays
+- `if`, `match`, destructuring, and generators
+- `try/catch`, `throw`, and `defer`
+- runtime-backed `std:` modules
+- user-module imports with cycle rejection and once-per-module initialization
 
-- [CLI overview](./overview.md)
-- [Compile](./compile.md)
-- [Compile vs run](../implementation-status/compile-vs-run.md)
+## When to prefer it
+
+Use `run` when:
+
+- you want the most complete current behavior
+- you are testing program semantics instead of binary output
+- you want to validate that runtime-backed `std:` operations behave as expected
+
+## Comparison to JavaScript
+
+This is not "run the transpiled JavaScript." The language runtime is its own system, implemented in Rust, with its own semantics for effects, tasks, deferred work, and module loading.
+
+## Related pages
+
+- [Execution Model](../runtime/execution-model.md)
+- [fscript compile](./compile.md)
+- [Compile vs Run](../implementation-status/compile-vs-run.md)

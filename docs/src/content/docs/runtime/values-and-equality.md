@@ -5,9 +5,9 @@ description: Runtime value categories, immutable data, and structural equality r
 
 # Values and Equality
 
-The runtime needs a concrete value model for both execution and interop boundaries.
+The runtime needs a concrete model for the values that flow through execution.
 
-## Runtime Value Categories
+## Minimum value categories
 
 - number
 - string
@@ -16,24 +16,22 @@ The runtime needs a concrete value model for both execution and interop boundari
 - undefined
 - record
 - array
-- function and closure
+- function or closure
 - generator
 - deferred task
 - effect task handle
-- tagged union record values
 
-## Structural Equality
+## Equality rules
 
-The runtime must support structural equality for plain data:
+Structural equality applies to plain data:
 
-- primitives by value
-- arrays by element comparison
-- records by field comparison
-- tagged unions by structural comparison
+- primitives compare by value
+- arrays compare element by element
+- records compare field by field
+- tagged unions compare structurally
 
-Functions, generators, and streams are not comparable in the same way.
+The runtime should not treat functions or generators as structurally comparable values.
 
-## Related Pages
+## Why this matters
 
-- [Records and arrays](../language-guide/records-and-arrays.md)
-- [Record types](../type-system/records.md)
+These rules help keep FScript's immutable data model useful and predictable without turning every runtime value into a deep-equality free-for-all.

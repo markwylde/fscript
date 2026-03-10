@@ -5,9 +5,9 @@ description: The native runtime model behind FScript's pure expressions, effects
 
 # Runtime Overview
 
-FScript is designed around a native runtime rather than a JavaScript engine. The runtime exists to execute well-typed programs predictably and efficiently while preserving the language's async-by-semantics model.
+The runtime exists to execute well-typed FScript programs efficiently and predictably without depending on a JavaScript engine.
 
-## Runtime Responsibilities
+## Core responsibilities
 
 - program startup
 - module initialization
@@ -15,18 +15,22 @@ FScript is designed around a native runtime rather than a JavaScript engine. The
 - implicit suspension and resumption
 - generator state management
 - native implementations of `std:` modules
-- error propagation across runtime boundaries
+- error propagation across host boundaries
 
-## Runtime Principles
+## Core principles
 
-- pure code should not pay scheduler overhead
+- pure code should not pay async scheduler overhead
+- effectful work may suspend implicitly
 - effectful calls start eagerly by default
-- laziness is explicit through `defer`
-- observable ordering is preserved unless independence is clear
+- `defer` is the explicit tool for laziness
 
-## Read More
+## What this means in practice
 
-- [Execution model](./execution-model.md)
+FScript source often looks sequential even when effectful work is involved. The runtime, not `Promise` syntax in user code, coordinates when work starts and when execution needs to wait for results.
+
+## Related pages
+
+- [Execution Model](./execution-model.md)
 - [Scheduler](./scheduler.md)
 - [Tasks](./tasks.md)
-- [Module loading](./module-loading.md)
+- [Module Loading](./module-loading.md)

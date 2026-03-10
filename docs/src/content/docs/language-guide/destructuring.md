@@ -7,21 +7,30 @@ Patterns are used in bindings, parameters, and `match` arms.
 
 ## Record destructuring
 
-```fs
-{ name } = user
+```fscript
+{ name, active } = user
 ```
 
-```fs
-{ tag: 'member', name } = account
+You can also match nested structure:
+
+```fscript
+{ tag: 'member', name } = value
 ```
 
 ## Array destructuring
 
-```fs
+```fscript
 [first, second] = items
 ```
 
-## Why it matters
+## Why patterns matter
 
-Destructuring works naturally with tagged unions and pattern matching, so it is a core part of the language rather than a minor convenience.
+Patterns make FScript's expression-oriented style more concise:
 
+- bindings can unpack the shape you need immediately
+- `match` arms can describe both branching and extraction
+- tagged unions become especially readable
+
+## Comparison to JavaScript
+
+The syntax is familiar if you know JS destructuring, but in FScript patterns are also a central part of matching and type narrowing rather than just a convenience for assignment.

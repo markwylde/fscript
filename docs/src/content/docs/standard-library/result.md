@@ -7,13 +7,13 @@ description: Typed expected-failure handling with ok and error variants.
 
 `std:result` is the preferred model for recoverable failures.
 
-```fs
+```fscript
 import Result from 'std:result'
 ```
 
-## Core Type
+## Core type
 
-```fs
+```fscript
 type Result<T, E> =
   | { tag: 'ok', value: T }
   | { tag: 'error', error: E }
@@ -21,10 +21,11 @@ type Result<T, E> =
 
 ## Representative API
 
-```fs
+```fscript
 Result.ok = <T, E>(value: T): Result<T, E>
 Result.error = <T, E>(error: E): Result<T, E>
 Result.map = <T, U, E>(fn: (value: T): U, result: Result<T, E>): Result<U, E>
+Result.mapError = <T, E, F>(fn: (error: E): F, result: Result<T, E>): Result<T, F>
 Result.andThen = <T, U, E>(fn: (value: T): Result<U, E>, result: Result<T, E>): Result<U, E>
 Result.withDefault = <T, E>(fallback: T, result: Result<T, E>): T
 Result.isOk = <T, E>(result: Result<T, E>): Boolean
@@ -33,33 +34,22 @@ Result.isError = <T, E>(result: Result<T, E>): Boolean
 
 ## Example
 
-```fs
-import Number from 'std:number'
-import Result from 'std:result'
-import String from 'std:string'
-
-type ParseError = {
-  tag: 'parse_error',
-  message: String,
-}
-
-parsePort = (text: String): Result<Number, ParseError> => {
+```fscript
+parsePort = (text: String) => {
   if (String.isDigits(text)) {
     Result.ok(Number.parse(text))
   } else {
-    Result.error({
-      tag: 'parse_error',
-      message: 'port must contain digits only',
-    })
+    Result.error({ tag: 'parse_error', message: 'port must contain digits only' })
   }
 }
 ```
 
-## Current Implementation Note
+## Why use it
 
-The current runtime-backed implementation already exposes `ok`, `error`, `isOk`, `isError`, and `withDefault`.
+- success and failure stay explicit in the type
+- callers can recover with `match`
+- ordinary failures do not need exceptions
 
-## Related Pages
+## Current implementation note
 
-- [Errors](../language-guide/errors.md)
-- [Tagged unions](../type-system/tagged-unions.md)
+The current runtime-backed surface already exposes the core constructors and basic helpers such as `ok`, `error`, `isOk`, `isError`, and `withDefault`.

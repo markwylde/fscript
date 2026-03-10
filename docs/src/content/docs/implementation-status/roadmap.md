@@ -5,26 +5,36 @@ description: The main near-term direction implied by the implementation plan and
 
 # Roadmap
 
-The implementation plan points toward a clear next phase rather than an open-ended wishlist.
+The implementation plan points to two major near-term tracks.
 
-## Near-Term Direction
+## 1. Keep `run` as the semantic source of truth
 
-- deepen the shared IR and interpreter coverage where it is still conservative
-- add scheduler-backed effect execution and host IO semantics
-- keep `run` as the source of truth for execution behavior
-- grow native code generation toward parity with that shared runtime contract
+The shared IR, runtime, and interpreter path is already valuable and should keep getting stronger. In practice that means:
 
-## Docs Implication
+- preserving broad frontend coverage
+- improving runtime fidelity
+- extending scheduler behavior for longer-lived dependency-driven execution
 
-As the implementation evolves, the docs should keep separating:
+## 2. Expand true native compile coverage
 
-- specified language behavior
-- current implementation behavior
-- future planned work
+The real native backend already exists for a bounded slice. The next job is to widen that slice until compile parity becomes much closer to `run`.
 
-That clarity is part of the product, not just a note for contributors.
+That includes:
 
-## Related Pages
+- broadening Cranelift lowering
+- deepening the runtime ABI contract
+- retiring embedded-runner dependence over time
 
-- [Implementation status overview](./overview.md)
-- [Supported features](./supported-features.md)
+## 3. Keep the docs honest
+
+During this stage, a good roadmap is also a documentation goal:
+
+- say clearly what is implemented
+- distinguish design intent from shipped behavior
+- avoid implying full parity where it does not exist yet
+
+## What this means for users today
+
+- learn the language model confidently
+- use `check` and `run` as the most stable daily workflow
+- treat `compile` as actively improving rather than frozen

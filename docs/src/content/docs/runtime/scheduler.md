@@ -7,7 +7,7 @@ description: The single-threaded scheduler that coordinates effectful work in Dr
 
 Draft 0.1 uses a single-threaded scheduler.
 
-## Why Single-Threaded
+## Why single-threaded
 
 - simpler semantics
 - easier determinism
@@ -18,16 +18,10 @@ Draft 0.1 uses a single-threaded scheduler.
 
 - manage ready tasks
 - manage suspended tasks
-- resume tasks when dependencies resolve
-- preserve observable ordering
+- resume work when dependencies resolve
+- preserve observable ordering for effects
 - support explicit deferred tasks
 
-## Important Caveat
+## Current implementation note
 
-The runtime spec describes the intended scheduler model clearly, but implementation parity is still evolving. The docs keep that distinction visible so the conceptual model stays accurate without overstating what is complete today.
-
-## Related Pages
-
-- [Execution model](./execution-model.md)
-- [Tasks](./tasks.md)
-- [Implementation status](../implementation-status/supported-features.md)
+The repository already has a shared scheduler abstraction used by the runtime and interpreter for deferred execution and ordinary effectful native calls. A remaining roadmap item is broader long-lived dependency draining across a whole evaluation.

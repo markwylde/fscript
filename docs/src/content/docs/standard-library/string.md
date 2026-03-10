@@ -5,37 +5,35 @@ description: String transformation and inspection helpers.
 
 # `std:string`
 
-`std:string` groups common string helpers under an explicit import.
+`std:string` provides explicit string helpers.
 
-```fs
+```fscript
 import String from 'std:string'
 ```
 
 ## Representative API
 
-```fs
+```fscript
 String.length = (value: String): Number
 String.uppercase = (value: String): String
 String.lowercase = (value: String): String
 String.trim = (value: String): String
 String.split = (separator: String, value: String): String[]
 String.join = (separator: String, values: String[]): String
+String.startsWith = (prefix: String, value: String): Boolean
+String.endsWith = (suffix: String, value: String): Boolean
+String.contains = (part: String, value: String): Boolean
 String.isDigits = (value: String): Boolean
 ```
 
 ## Example
 
-```fs
-import String from 'std:string'
-
-normalized = String.uppercase(String.trim('  ada  '))
+```fscript
+normalized = text
+  |> String.trim
+  |> String.lowercase
 ```
 
-## Current Implementation Note
+## Comparison to JavaScript
 
-The current runtime-backed implementation already exposes `trim`, `uppercase`, `lowercase`, and `isDigits`.
-
-## Related Pages
-
-- [Primitive types](../type-system/primitive-types.md)
-- [Result-based error handling example](../examples/result-based-error-handling.md)
+Instead of instance methods like `text.trim()`, FScript uses imported helpers so the standard library stays explicit and uniform.

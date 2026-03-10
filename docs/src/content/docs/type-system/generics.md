@@ -5,13 +5,22 @@ description: Reusable type parameters for arrays, results, sequences, and other 
 
 Generics let you write reusable abstractions without giving up type precision.
 
-```fs
+## Examples
+
+```fscript
 type Maybe<T> = T | Null
+type Result<T, E> =
+  | { tag: 'ok', value: T }
+  | { tag: 'error', error: E }
 ```
 
-You will see generics heavily in the standard library:
+## Where you will see them most
 
-```fs
-Array.map = <T, U>(fn: (value: T): U, items: T[]): U[]
-```
+- arrays like `T[]`
+- results like `Result<T, E>`
+- sequences like `Sequence<T>`
+- standard-library helpers such as `Array.map`
 
+## Comparison to TypeScript
+
+The syntax is intentionally familiar. Draft 0.1 focuses on the straightforward reusable cases that make value-oriented code ergonomic.

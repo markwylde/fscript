@@ -5,47 +5,50 @@ description: A high-level summary of the formal grammar categories described in 
 
 # Grammar Reference
 
-The formal grammar lives in `specs/GRAMMAR.md`. This page is a quick map of the major categories.
+This page is a compact guide to the main grammar categories from `specs/GRAMMAR.md`. It is not a full formal grammar listing.
 
-## Top-Level Items
+## Top-level forms
 
 - imports
 - exports
 - type declarations
 - binding declarations
 
-## Pattern Forms
+## Pattern forms
 
 - identifier patterns
 - record patterns
 - array patterns
 - literal patterns
 
-## Type Forms
+## Type forms
 
-- unions
-- intersections
-- arrays
-- records
-- functions
-- generics
+- primitive type names
+- record types
+- array types
+- function types
+- generic types
+- union types
+- intersection types
+- literal types
 
-## Expression Families
+## Expression forms
 
 - literals
 - identifiers
 - records and arrays
-- arrow functions
+- function arrows
 - calls
+- member access
+- indexing
 - pipes
 - `if`
 - `match`
-- `try` / `catch`
+- `try/catch`
 - `throw`
 - `defer`
-- `yield`
+- generator arrows with `yield`
 
-## Related Pages
+## When to use this page
 
-- [Syntax reference](./syntax-reference.md)
-- [Language guide](../language-guide/syntax-overview.md)
+Use this page for orientation, then read the spec directly if you need exact grammar rules or parser-facing detail.

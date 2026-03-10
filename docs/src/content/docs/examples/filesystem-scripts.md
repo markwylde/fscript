@@ -5,21 +5,47 @@ description: Work with runtime-backed filesystem capabilities through explicit s
 
 # Filesystem Scripts
 
-FScript exposes file IO through `std:filesystem`, not through Node.js globals.
+Filesystem work is one of the clearest examples of FScript's effect model. Host IO is explicit and comes from `std:filesystem`.
 
-```fs
+## Example: read, trim, and log
+
+```fscript
 import FileSystem from 'std:filesystem'
+import Logger from 'std:logger'
+import String from 'std:string'
 
-loadText = (path: String): String => FileSystem.readFile(path)
+showConfig = (path: String): Undefined => {
+  text = FileSystem.readFile(path)
+  Logger.info(String.trim(text))
+}
+
+showConfig('./config.json')
 ```
 
-## Why This Pattern Matters
+## What this demonstrates
 
-- the capability is explicit in the import
-- the call is effectful by language semantics
-- the runtime handles the host boundary
+- no global `fs` object
+- no `async` / `await`
+- no `Promise` chaining in source code
+- effectful work still looks sequential
 
-## Related Pages
+## Good structure for scripts
 
-- [std:filesystem](../standard-library/filesystem.md)
-- [Runtime boundaries](../runtime/errors-and-boundaries.md)
+Keep effectful boundaries thin:
+
+```fscript
+import FileSystem from 'std:filesystem'
+import Json from 'std:json'
+import Result from 'std:result'
+
+readJsonFile = (path: String) => {
+  text = FileSystem.readFile(path)
+  Json.parse(text)
+}
+```
+
+Then pass parsed data into pure helpers that handle validation and transformation.
+
+## Current implementation note
+
+The current runtime already ships a runtime-backed filesystem module. As with the rest of Draft 0.1, the docs aim to show the model clearly while leaving room for the API surface to keep maturing.

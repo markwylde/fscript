@@ -5,41 +5,30 @@ description: Pure evaluation, eager effect start, implicit suspension, and expli
 
 # Execution Model
 
-FScript programs are expression-oriented and async by semantics.
+FScript programs are expression-oriented and async-by-semantics.
 
-## Core Rules
+## The short version
 
 - pure expressions evaluate immediately
 - effectful calls start eagerly when reached
-- values from effectful calls suspend implicitly when consumed
-- effects preserve observable ordering unless proven independent
-- `defer expr` delays effect start intentionally
+- execution suspends only when a not-yet-ready value is consumed
+- `defer` delays effect start explicitly
 
 ## Example
 
-```fs
-something = (): String => {
-  filepath = '/tmp/test.txt'
-  content = getContent()
-  FileSystem.writeFile(filepath, content)
+```fscript
+save = (path: String, content: String): String => {
+  FileSystem.writeFile(path, content)
   content
 }
 ```
 
-At a high level, the runtime:
+The runtime starts effectful work as execution reaches it while preserving observable ordering rules.
 
-1. binds `filepath`
-2. starts `getContent()` eagerly
-3. suspends if `content` is needed before it is ready
-4. starts `writeFile` when its dependencies are ready
-5. resolves the final block value
+## Why this is unusual
 
-## Why This Matters
+JavaScript exposes most async workflows through `Promise`, `async`, and `await`. FScript moves that concern into the runtime model instead. The goal is direct-looking code with explicit effect semantics.
 
-This model lets source code stay smaller than promise-heavy JavaScript while still representing real effectful execution.
+## Design intent
 
-## Related Pages
-
-- [Effects](../language-guide/effects.md)
-- [Defer and laziness](../language-guide/defer-and-laziness.md)
-- [Tasks](./tasks.md)
+The runtime should preserve observable source ordering unless effects are proven independent.

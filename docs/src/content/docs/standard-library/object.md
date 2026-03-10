@@ -5,36 +5,37 @@ description: Immutable record composition and explicit object helpers.
 
 # `std:object`
 
-`std:object` provides explicit record helpers without relying on prototypes.
+`std:object` provides explicit helpers for working with records.
 
-```fs
+```fscript
 import Object from 'std:object'
 ```
 
 ## Representative API
 
-```fs
+```fscript
 Object.spread = <T>(parts: T[]): T
 Object.keys = <T>(value: T): String[]
 Object.values = <T>(value: T): Unknown[]
+Object.entries = <T>(value: T): { key: String, value: Unknown }[]
 Object.has = <T>(key: String, value: T): Boolean
+Object.get = <T>(key: String, value: T): Unknown | Null
 Object.set = <T, V>(key: String, fieldValue: V, value: T): T
 ```
 
 ## Example
 
-```fs
-import Object from 'std:object'
-
-base = { a: 1 }
-next = Object.spread(base, { b: 2 })
+```fscript
+base = { id: '1', name: 'Ada' }
+next = Object.spread(base, { active: true })
 ```
 
-## Current Implementation Note
+## Notes
 
-The current runtime-backed implementation already exposes `Object.spread`.
+- record updates preserve immutability
+- `Object.spread` should merge left to right
+- dynamic-key helpers may be conservative at the type level in Draft 0.1
 
-## Related Pages
+## Comparison to JavaScript
 
-- [Bindings and immutability](../language-guide/bindings-and-immutability.md)
-- [Record types](../type-system/records.md)
+This is the explicit alternative to object spread plus prototype-era habits. Records stay plain, and helpers stay imported.

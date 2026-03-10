@@ -5,9 +5,9 @@ description: Eager tasks, deferred tasks, and the runtime representation of effe
 
 # Tasks
 
-The runtime represents effectful work explicitly.
+The runtime represents effectful work explicitly as tasks.
 
-## Minimum Task States
+## Minimum task states
 
 - created
 - ready
@@ -15,19 +15,20 @@ The runtime represents effectful work explicitly.
 - waiting
 - completed
 - failed
-- canceled reserved for future use
+- canceled
 
-## Core Categories
+## Two main categories
 
-- eager tasks start when execution reaches them
-- deferred tasks are created by `defer` and start only when forced or invoked
+`eager task`
+: starts when execution reaches it
 
-## Practical Rule
+`deferred task`
+: created through `defer` and started only when forced
 
-Pure functions do not become scheduler-managed tasks. Only effectful operations need that machinery.
+## Why tasks matter
 
-## Related Pages
+Tasks are how the runtime keeps pure code lightweight while still giving effectful work a clear lifecycle.
 
-- [Defer and laziness](../language-guide/defer-and-laziness.md)
-- [std:task](../standard-library/task.md)
-- [Scheduler](./scheduler.md)
+## Current implementation note
+
+The shared runtime already tracks deferred and ordinary effectful work with explicit task state and memoized outcomes.

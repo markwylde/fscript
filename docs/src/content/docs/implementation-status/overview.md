@@ -5,22 +5,42 @@ description: How to read the docs when the language and implementation are still
 
 # Implementation Status
 
-FScript is documented from both specification and current implementation sources. Those are related, but they are not identical.
+FScript is documented as a language with a clear Draft 0.1 direction, but the repository is still in an implementation-building phase. That means two things are true at once:
 
-## How To Read These Docs
+- the docs describe the intended language and runtime model
+- some features are more complete in the current toolchain than others
 
-- "FScript specifies ..." refers to the Draft 0.1 language design
-- "The current implementation ..." refers to behavior present in the repository today
-- "Draft 0.1 plans ..." refers to intended future direction within the current design
+## How to read the rest of the docs
 
-## Practical Reality
+Use the docs in three layers:
 
-- the specs are broader than some currently shipped runtime surfaces
-- `run` is currently broader than `compile`
-- core stdlib modules exist, but some expose a smaller implementation subset than their representative spec APIs
+1. language and type-system pages explain the intended model
+2. CLI and runtime pages explain the current shipped behavior
+3. implementation-status pages explain where parity is still expanding
 
-## Related Pages
+## Current high-level reality
 
-- [Supported features](./supported-features.md)
-- [Compile vs run](./compile-vs-run.md)
+Today the project already has:
+
+- a substantial parser and semantic frontend
+- strict typechecking for the implemented executable subset
+- effect analysis
+- a shared runtime and interpreter path for `run`
+- runtime-backed `std:` modules
+- a mixed compile pipeline with a real native backend slice plus broader bridge coverage
+
+The remaining gap is not "nothing works yet." The remaining gap is that some parts of the language are further along than others, especially on the fully native compile path.
+
+## Good expectation setting
+
+If you are evaluating the project right now:
+
+- trust `check` for compiler validation work
+- treat `run` as the broadest current execution path
+- treat `compile` as useful and real, but still growing toward full parity
+
+## Related pages
+
+- [Supported Features](./supported-features.md)
+- [Compile vs Run](./compile-vs-run.md)
 - [Roadmap](./roadmap.md)

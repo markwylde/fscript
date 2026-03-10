@@ -13,5 +13,22 @@ Draft 0.1 recommends these canonical built-in names:
 - `Never`
 - `Unknown`
 
-There is no implicit primitive coercion. `Number` is not automatically a `String`, and `Null` or `Undefined` are not universal defaults.
+## Example values
 
+```fscript
+count = 10
+name = 'Ada'
+active = true
+empty = Null
+missing = Undefined
+```
+
+## Important rules
+
+- there is no implicit coercion between primitive types
+- `Null` is not assignable to everything by default
+- `Undefined` is not assignable to everything by default
+
+## Comparison to JavaScript
+
+JavaScript performs many implicit coercions. FScript does not. That makes programs more predictable and keeps the type system easier to trust.

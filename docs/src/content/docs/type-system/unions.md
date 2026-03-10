@@ -5,9 +5,24 @@ description: Model values that may be one of several alternatives and narrow the
 
 Union types represent values that may be one of several alternatives.
 
-```fs
-type Status = 'ok' | 'error'
+## Example
+
+```fscript
+type Id = Number | String
 ```
 
-Unions are especially useful with literal tags, optional-like shapes, and validation flows.
+## When to use unions
 
+- optional-like domain values
+- parser outputs before narrowing
+- tagged union variant groups
+
+## How unions become useful
+
+Unions are usually paired with:
+
+- `if` checks
+- `match`
+- tagged discriminants
+
+Those tools narrow the active case so the rest of the code can stay precise.

@@ -5,42 +5,34 @@ description: Runtime-backed file IO and other host filesystem capabilities.
 
 # `std:filesystem`
 
-`std:filesystem` provides native file IO through the runtime.
+`std:filesystem` provides runtime-backed file access.
 
-```fs
+```fscript
 import FileSystem from 'std:filesystem'
 ```
 
-## Representative API
+## Typical usage
 
-```fs
-FileSystem.readFile = (path: String): String
-FileSystem.writeFile = (path: String, content: String): Undefined
-FileSystem.exists = (path: String): Boolean
-FileSystem.deleteFile = (path: String): Undefined
-FileSystem.readDir = (path: String): String[]
+```fscript
+readConfig = (path: String): String => {
+  FileSystem.readFile(path)
+}
 ```
 
-## Semantics
+## What this module represents
 
-- these functions are effectful
-- effectful calls start eagerly by default
-- they participate in implicit suspension and resolution semantics
-- they are provided by the FScript runtime, not Node.js globals
+Filesystem access is effectful. FScript keeps that explicit:
 
-## Example
+- the capability is imported
+- the runtime owns the host interaction
+- your code can keep the pure transformation steps separate
 
-```fs
-import FileSystem from 'std:filesystem'
+## Good practice
 
-loadText = (path: String): String => FileSystem.readFile(path)
-```
+- keep file reads and writes near the boundary of the program
+- parse and validate file contents explicitly after reading
+- move pure shaping work into separate helpers
 
-## Current Implementation Note
+## Current implementation note
 
-The current runtime-backed implementation already exposes `readFile`, `writeFile`, `exists`, `deleteFile`, and `readDir`.
-
-## Related Pages
-
-- [Effects](../language-guide/effects.md)
-- [Runtime boundaries](../runtime/errors-and-boundaries.md)
+The current runtime already ships filesystem support and uses it in the interpreter-backed `run` path.

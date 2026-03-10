@@ -5,12 +5,31 @@ description: How control flow and pattern matching refine types and why tagged u
 
 Pattern matching narrows types within each branch.
 
-```fs
-match (user) {
-  { tag: 'guest' } => 'guest'
-  { tag: 'member', name } => name
+## Example
+
+```fscript
+type LoadResult =
+  | { tag: 'loading' }
+  | { tag: 'loaded', value: String }
+  | { tag: 'failed', message: String }
+
+message = (result: LoadResult): String => match (result) {
+  { tag: 'loading' } => 'loading'
+  { tag: 'loaded', value } => value
+  { tag: 'failed', message } => message
 }
 ```
 
-For tagged unions, `match` should be exhaustive in Draft 0.1. This keeps control flow explicit and avoids silent fallthrough.
+Inside each branch, the active variant is known more precisely.
 
+## Why exhaustiveness matters
+
+Exhaustive handling helps:
+
+- avoid forgotten cases
+- keep union-heavy code maintainable
+- support stronger compiler guarantees
+
+## Comparison to TypeScript
+
+TypeScript can narrow through control flow too, but FScript leans harder on `match` and tagged unions as the standard way to express those checks.
